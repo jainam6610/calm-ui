@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -67,6 +68,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -226,28 +228,31 @@ fun Widgets(vm: LauncherViewModel, padStart: Dp, padEnd: Dp, compact: Boolean, m
         snapshotFlow { scroll.value }.first { it != anchor }
         if (vm.selectedWidgetId == sel) vm.selectedWidgetId = null
     }
-    Column(
-        modifier
-            .fillMaxWidth()
-            .heightIn(max = maxH)
-            .verticalScroll(scroll)
-            .padding(start = padStart, end = padEnd),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        rows.forEach { row ->
-            key(row.joinToString { it.id }) {
-                Appear {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                        row.forEach { w -> Box(Modifier.weight(1f)) { WidgetBody(w, vm, compact) } }
+    val arrangeHome = vm.selectedWidgetId != null && vm.homeWidgets.any { it.id == vm.selectedWidgetId }
+    Box(modifier.fillMaxWidth().heightIn(max = maxH)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(scroll)
+                .padding(start = padStart, end = padEnd),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            rows.forEach { row ->
+                key(row.joinToString { it.id }) {
+                    Appear {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+                            row.forEach { w -> Box(Modifier.weight(1f)) { WidgetBody(w, vm, compact) } }
+                        }
                     }
                 }
             }
-        }
-        if (rows.isEmpty()) {
-            Box(Modifier.fillMaxWidth().glass(24.dp).tap { vm.widgetCenter = true }.padding(18.dp), contentAlignment = Alignment.Center) {
-                Txt("No widgets yet. Tap to add one.", 13f, c.fg2)
+            if (rows.isEmpty()) {
+                Box(Modifier.fillMaxWidth().glass(24.dp).tap { vm.widgetCenter = true }.padding(18.dp), contentAlignment = Alignment.Center) {
+                    Txt("No widgets yet. Tap to add one.", 13f, c.fg2)
+                }
             }
         }
+        ArrangeBar(vm, arrangeHome, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
     }
 }
 
@@ -292,37 +297,18 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
     val fg = toneColor(w.tone, c)
     val fg2 = fg.copy(alpha = 0.6f)
     val selected = vm.selectedWidgetId == w.id
-    // Home-only selection accent: Board draws its own border block (W4), so a second
-    // unconditional accent source here would double it. The guard is the point.
+    // Single border source: this frame draws both mode and accent borders for Home and
+    // Board alike, so BoardWidget must not add its own accent border on top (W5).
     val onBoard = vm.boardWidgets.any { it.id == w.id }
-    val stroke = if (selected && !onBoard) c.accent.copy(alpha = 0.6f) else c.fg2.copy(alpha = 0.22f)
-
-    fun moveVert(delta: Int) {
-        val i = vm.boardWidgets.indexOfFirst { it.id == w.id }
-        if (i >= 0) { // Board → row-aware, skips half-pair partners
-            val (up, down) = boardVerticalNeighbors(vm.boardWidgets.toList(), i)
-            val t = if (delta < 0) up else down
-            if (t == null) return // boundary no-op — no haptic
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            vm.reorderBoardWidget(i, t)
-            return
-        }
-        val hi = vm.homeWidgets.indexOfFirst { it.id == w.id }
-        if (hi < 0 || hi + delta !in vm.homeWidgets.indices) return // mirrors moveWidget bounds check
-        vm.moveWidget(w.id, delta)
-        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    val arranging = vm.selectedWidgetId != null &&
+        (if (onBoard) vm.boardWidgets else vm.homeWidgets).any { it.id == vm.selectedWidgetId }
+    val stroke = when {
+        selected -> c.accent.copy(alpha = 0.6f)
+        arranging -> c.fg2.copy(alpha = 0.45f)
+        else -> c.fg2.copy(alpha = 0.22f)
     }
 
-    Column(Modifier.fillMaxWidth().animateContentSize(Motion.Size)) {
-        if (selected) {
-            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                SelChip("↑", Modifier.width(48.dp)) { moveVert(-1) }
-                SelChip("↓", Modifier.width(48.dp)) { moveVert(1) }
-                SelChip("Edit", Modifier.weight(1f)) { vm.editWidgetId = w.id }
-                SelChip("Remove", Modifier.weight(1f), danger = true) { vm.removeWidget(w.id) }
-                SelChip("Done", Modifier.weight(1f), filled = true) { vm.selectedWidgetId = null }
-            }
-        }
+    Column(Modifier.fillMaxWidth().then(if (selected) Modifier.animateContentSize(Motion.Size) else Modifier)) {
         // Widget content with long-press to select
         Box(
             Modifier
@@ -331,14 +317,22 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                     when (w.bg) {
                         WidgetBg.Glass -> Modifier.glass(12.dp).border(1.dp, stroke, RoundedCornerShape(12.dp))
                         WidgetBg.Solid -> Modifier.clip(RoundedCornerShape(12.dp)).background(if (c.dark) Color(0xFF1C1C1E) else Color.White).border(1.dp, stroke, RoundedCornerShape(12.dp))
-                        WidgetBg.None -> if (selected && !onBoard) Modifier.border(1.dp, stroke, RoundedCornerShape(12.dp)) else Modifier
+                        WidgetBg.None -> if (selected || arranging) Modifier.border(1.dp, stroke, RoundedCornerShape(12.dp)) else Modifier
                     }
                 )
                 .pointerInput(w.id) {
-                    detectTapGestures(onLongPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        vm.selectedWidgetId = w.id
-                    })
+                    detectTapGestures(
+                        // In Arrange mode a plain tap re-targets (content taps win where they consume).
+                        onTap = { if (vm.selectedWidgetId != null) vm.selectedWidgetId = w.id },
+                        onLongPress = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            vm.selectedWidgetId = w.id
+                            if (!vm.resizeHintShown) {
+                                vm.resizeHintShown = true
+                                vm.toast = "Drag corner to resize"
+                            }
+                        }
+                    )
                 }
                 .padding(if (w.bg == WidgetBg.None) 6.dp else 12.dp)
         ) {
@@ -404,15 +398,27 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                                 }
                             }
                         },
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.BottomEnd
                 ) {
-                    Box(
-                        Modifier
-                            .width(36.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(c.fg2.copy(alpha = 0.4f))
-                    )
+                    // Corner bracket — fuses with the accent border, legible at any widget height.
+                    Box(Modifier.size(18.dp)) {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .clip(RoundedCornerShape(1.5.dp))
+                                .background(c.accent)
+                        )
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .width(3.dp)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(1.5.dp))
+                                .background(c.accent)
+                        )
+                    }
                 }
             }
         }
@@ -432,6 +438,54 @@ private fun SelChip(label: String, modifier: Modifier, danger: Boolean = false, 
         modifier.height(44.dp).clip(RoundedCornerShape(12.dp)).background(bg).tap(onClick = onClick),
         contentAlignment = Alignment.Center
     ) { Txt(label, 13f, fg) }
+}
+
+/** Shared ↑/↓ move for the Arrange bar: Board-aware (skips half-pair partners), else home order. */
+private fun moveVert(vm: LauncherViewModel, w: WidgetItem, delta: Int, haptic: HapticFeedback) {
+    val i = vm.boardWidgets.indexOfFirst { it.id == w.id }
+    if (i >= 0) { // Board → row-aware, skips half-pair partners
+        val (up, down) = boardVerticalNeighbors(vm.boardWidgets.toList(), i)
+        val t = if (delta < 0) up else down
+        if (t == null) return // boundary no-op — no haptic
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        vm.reorderBoardWidget(i, t)
+        return
+    }
+    val hi = vm.homeWidgets.indexOfFirst { it.id == w.id }
+    if (hi < 0 || hi + delta !in vm.homeWidgets.indices) return // mirrors moveWidget bounds check
+    vm.moveWidget(w.id, delta)
+    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+}
+
+/** Arrange-mode toolbar — fixed at the page bottom, shared by Home widgets and the Board.
+ *  Staggered: borders/handles land at t=0, controls fade in a beat later. */
+@Composable
+fun ArrangeBar(vm: LauncherViewModel, onPage: Boolean, modifier: Modifier = Modifier) {
+    val haptic = LocalHapticFeedback.current
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(onPage) {
+        if (onPage) {
+            shown = false
+            delay(130) // let mode borders land first (Niagara-style reveal)
+            shown = true
+        } else shown = false
+    }
+    AnimatedVisibility(visible = onPage && shown, enter = fadeIn(Motion.Micro), modifier = modifier) {
+        val sel = vm.selectedWidgetId
+        if (sel != null) {
+            Row(
+                Modifier.glass(20.dp).padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val w = vm.findWidget(sel)
+                SelChip("↑", Modifier.width(48.dp)) { if (w != null) moveVert(vm, w, -1, haptic) }
+                SelChip("↓", Modifier.width(48.dp)) { if (w != null) moveVert(vm, w, 1, haptic) }
+                SelChip("Edit", Modifier.width(72.dp)) { vm.editWidgetId = sel }
+                SelChip("Remove", Modifier.width(88.dp), danger = true) { vm.removeWidget(sel) }
+                SelChip("Done", Modifier.width(72.dp), filled = true) { vm.selectedWidgetId = null }
+            }
+        }
+    }
 }
 
 @Composable

@@ -1,7 +1,6 @@
 package com.studentlauncher.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -104,18 +103,19 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
     // when the selection actually belongs to this board.
     val selOnBoard = editingId != null && vm.boardWidgets.any { it.id == editingId }
 
-    LazyColumn(
-        modifier = modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        userScrollEnabled = !selOnBoard && dragId == null
-    ) {
+    Box(modifier) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            userScrollEnabled = !selOnBoard && dragId == null
+        ) {
         item {
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Txt("WIDGET BOARD", 11f, c.fg2, FontWeight.Bold); Txt("Arrange your home", 20f, c.fg, FontWeight.SemiBold) }
                 PillButton("Add", { vm.widgetTargetHome = false; vm.widgetTab = 0; vm.widgetCenter = true }, Modifier.semantics { contentDescription = "Add widget" })
             }
             if (editingId != null) {
-                Txt("Selected — drag to reorder, Done to finish", 11f, c.accent, modifier = Modifier.padding(top = 4.dp))
+                Txt("Arrange mode — drag to reorder, Done to finish", 11f, c.accent, modifier = Modifier.padding(top = 4.dp))
             } else {
                 Txt("Long-press a widget to edit", 11f, c.fg2, modifier = Modifier.padding(top = 4.dp))
             }
@@ -178,6 +178,8 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
             }
         }
         item { Spacer(Modifier.height(20.dp)) }
+        }
+        ArrangeBar(vm, selOnBoard, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
     }
 }
 
@@ -206,10 +208,10 @@ private fun BoardWidget(
                 }
             }
             .then(
+                // No border here — WidgetFrame is the single border source for both pages.
                 if (isEditing) Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .background(c.tile)
-                    .border(1.dp, c.accent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                 else Modifier
             )
             .pointerInput(item.id, isEditing) {
