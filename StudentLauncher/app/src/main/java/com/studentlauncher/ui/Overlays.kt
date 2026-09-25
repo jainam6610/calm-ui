@@ -86,13 +86,19 @@ fun FadeScrim(onTap: () -> Unit, progress: Float, max: Float = 0.22f) {
 
 /** Bottom sheet used by widgets, about and pause sheets. Springs up, dims the home screen. */
 @Composable
-fun BottomSheet(onDismiss: () -> Unit, maxHeightFrac: Float = 0.82f, content: @Composable ColumnScope.() -> Unit) {
+fun BottomSheet(
+    onDismiss: () -> Unit,
+    maxHeightFrac: Float = 0.82f,
+    dim: Float = 0.22f,
+    header: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
     val visible = remember { MutableTransitionState(true) }
     LaunchedEffect(visible.targetState) { if (!visible.targetState) onDismiss() }
     val e by animateFloatAsState(if (visible.targetState) 1f else 0f, Motion.Macro, label = "bs")
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val maxH = maxHeight * maxHeightFrac
-        FadeScrim({ visible.targetState = false }, e)
+        FadeScrim({ visible.targetState = false }, e, dim)
         Box(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.BottomCenter) {
             Column(
                 Modifier
@@ -102,10 +108,12 @@ fun BottomSheet(onDismiss: () -> Unit, maxHeightFrac: Float = 0.82f, content: @C
                     .heightIn(max = maxH)
                     .graphicsLayer { translationY = (1f - e) * size.height * 1.15f }
                     .glass(32.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                content = content
-            )
+                    .padding(20.dp)
+            ) {
+                // Pinned above the scroll area: the live widget preview rides the sheet top.
+                header?.invoke(this)
+                Column(Modifier.verticalScroll(rememberScrollState()), content = content)
+            }
         }
     }
 }

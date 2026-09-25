@@ -440,6 +440,12 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, compact: Boolean) {
         HostedWidget(vm, w, Modifier.fillMaxWidth())
         return
     }
+    WidgetFrame(w, vm) { fg, fg2 -> WidgetContent(w, vm, fg, fg2, compact) }
+}
+
+/** Frame-free widget render — the frame adds gestures; the settings-sheet preview doesn't want them. */
+@Composable
+fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, compact: Boolean) {
     val accent = LocalColors.current.accent
     // Height 1=80dp, 2=120dp, 3=180dp — controls max vertical space
     val maxContentH = when (w.height) {
@@ -447,36 +453,34 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, compact: Boolean) {
         3 -> if (compact) 140.dp else 180.dp
         else -> if (compact) 90.dp else 120.dp
     }
-    WidgetFrame(w, vm) { fg, fg2 ->
-        Column(Modifier.heightIn(max = maxContentH)) {
-            when (w.type) {
-                WT.CLOCK -> ClockContent(w, fg, fg2, accent)
-                WT.DATE -> DateContent(fg, fg2)
-                WT.WEEK -> WeekContent(w, fg, fg2, accent)
-                WT.BATTERY -> BatteryContent(fg, accent)
-                WT.NEXT -> NextContent(w, fg, fg2)
-                WT.COUNTDOWN -> CountdownContent(w, fg, fg2, accent)
-                WT.TIMER -> TimerContent(w, vm, fg, fg2, accent)
-                WT.TASKS -> TasksContent(w, vm, fg, fg2, accent)
-                WT.QUICK -> QuickContent(fg)
-                WT.SPHERE -> Box(Modifier.fillMaxWidth().height(if (compact) 60.dp else 80.dp)) {
-                    DotSphere(Modifier.fillMaxSize(), fg, accent)
-                }
-                WT.GLYPH -> GlyphContent(w, vm, fg, accent, compact)
-                WT.TODAY -> TodayContent(w, vm, fg, fg2, accent)
-                WT.EXPENSES -> ExpensesContent(w, vm, fg, fg2, accent)
-                WT.PLANNER -> PlannerContent(w, vm, fg, fg2, accent)
-                WT.REMINDERS -> RemindersContent(w, vm, fg, fg2)
-                WT.POMODORO -> PomodoroContent(w, vm, fg, fg2, accent)
-                WT.FLASHCARDS -> FlashcardsContent(w, vm, fg, fg2, accent)
-                WT.HABITS -> HabitsContent(w, vm, fg, fg2, accent)
-                WT.GPA -> GpaContent(w, vm, fg, fg2, accent)
-                WT.WATER -> WaterContent(w, vm, fg, fg2, accent)
-                WT.FORMULAS -> FormulasContent(w, vm, fg, fg2)
-                WT.ASSIGNMENTS -> AssignmentsContent(w, vm, fg, fg2, accent)
-                WT.MINDFUL_TODAY -> MindfulTodayContent(vm, fg, fg2, accent)
-                WT.MINDFUL_WEEK -> MindfulWeekContent(vm, fg, fg2, accent)
+    Column(Modifier.heightIn(max = maxContentH)) {
+        when (w.type) {
+            WT.CLOCK -> ClockContent(w, fg, fg2, accent)
+            WT.DATE -> DateContent(fg, fg2)
+            WT.WEEK -> WeekContent(w, fg, fg2, accent)
+            WT.BATTERY -> BatteryContent(fg, accent)
+            WT.NEXT -> NextContent(w, fg, fg2)
+            WT.COUNTDOWN -> CountdownContent(w, fg, fg2, accent)
+            WT.TIMER -> TimerContent(w, vm, fg, fg2, accent)
+            WT.TASKS -> TasksContent(w, vm, fg, fg2, accent)
+            WT.QUICK -> QuickContent(fg)
+            WT.SPHERE -> Box(Modifier.fillMaxWidth().height(if (compact) 60.dp else 80.dp)) {
+                DotSphere(Modifier.fillMaxSize(), fg, accent)
             }
+            WT.GLYPH -> GlyphContent(w, vm, fg, accent, compact)
+            WT.TODAY -> TodayContent(w, vm, fg, fg2, accent)
+            WT.EXPENSES -> ExpensesContent(w, vm, fg, fg2, accent)
+            WT.PLANNER -> PlannerContent(w, vm, fg, fg2, accent)
+            WT.REMINDERS -> RemindersContent(w, vm, fg, fg2)
+            WT.POMODORO -> PomodoroContent(w, vm, fg, fg2, accent)
+            WT.FLASHCARDS -> FlashcardsContent(w, vm, fg, fg2, accent)
+            WT.HABITS -> HabitsContent(w, vm, fg, fg2, accent)
+            WT.GPA -> GpaContent(w, vm, fg, fg2, accent)
+            WT.WATER -> WaterContent(w, vm, fg, fg2, accent)
+            WT.FORMULAS -> FormulasContent(w, vm, fg, fg2)
+            WT.ASSIGNMENTS -> AssignmentsContent(w, vm, fg, fg2, accent)
+            WT.MINDFUL_TODAY -> MindfulTodayContent(vm, fg, fg2, accent)
+            WT.MINDFUL_WEEK -> MindfulWeekContent(vm, fg, fg2, accent)
         }
     }
 }

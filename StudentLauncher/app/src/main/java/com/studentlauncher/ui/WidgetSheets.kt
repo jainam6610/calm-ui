@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,7 +120,26 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
     val w = vm.findWidget(id) ?: return
     val c = LocalColors.current
 
-    BottomSheet({ vm.editWidgetId = null }, 0.88f) {
+    // Pinned live preview rides the sheet top (skipped for hosted widgets — no cheap re-render).
+    val header: (@Composable ColumnScope.() -> Unit)? = if (w.type == WT.ANDROID) null else {
+        {
+            Box(Modifier.fillMaxWidth(if (w.half) 0.5f else 1f).padding(bottom = 14.dp)) {
+                val fg = toneColor(w.tone, c)
+                WidgetContent(w, vm, fg, fg.copy(alpha = 0.6f), compact = true)
+                // The preview mirrors, it doesn't respond — consume the event chain at the
+                // Initial pass so content taps (tasks, glyph, quick toggles) can't fire.
+                Box(
+                    Modifier.matchParentSize().pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    BottomSheet({ vm.editWidgetId = null }, maxHeightFrac = 0.45f, dim = 0.10f, header = header) {
         Txt(WT.title(w.type), 18f, c.fg, FontWeight.Medium)
 
         if (w.type == WT.ANDROID) {
