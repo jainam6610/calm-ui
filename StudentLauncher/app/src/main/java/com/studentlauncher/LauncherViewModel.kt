@@ -337,16 +337,27 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         return if (savedDate == today) prefs.getInt("pause_count_today", 0) else 0
     }
 
+    // ponytail: called per widget recomposition — cache the prefs parse per day,
+    // invalidated by recordUsage writes and date rollover.
+    private var usageDay = ""
+    private var usageList: List<DailyUsage> = emptyList()
+
     fun getTodayUsage(): List<DailyUsage> {
         val today = LocalDate.now().toString()
+        if (usageDay == today) return usageList
         val savedDate = prefs.getString("today_date", "") ?: ""
-        if (savedDate != today) return emptyList()
-        val raw = prefs.getString("today_usage", "") ?: ""
-        if (raw.isBlank()) return emptyList()
-        return raw.split("|").mapNotNull { part ->
-            val p = part.split(":")
-            if (p.size == 2) DailyUsage(p[0], (p[1].toIntOrNull() ?: 0)) else null
+        usageDay = today
+        usageList = if (savedDate != today) {
+            emptyList()
+        } else {
+            val raw = prefs.getString("today_usage", "") ?: ""
+            if (raw.isBlank()) emptyList()
+            else raw.split("|").mapNotNull { part ->
+                val p = part.split(":")
+                if (p.size == 2) DailyUsage(p[0], (p[1].toIntOrNull() ?: 0)) else null
+            }
         }
+        return usageList
     }
 
     private fun recordUsage(pkg: String, mins: Int) {
@@ -357,6 +368,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (idx >= 0) list[idx] = DailyUsage(pkg, list[idx].minutes + mins) else list.add(DailyUsage(pkg, mins))
         val encoded = list.joinToString("|") { "${it.pkg}:${it.minutes}" }
         prefs.edit().putString("today_date", today).putString("today_usage", encoded).apply()
+        usageDay = "" // invalidate so the next read re-parses the written value
     }
 
     fun unlockApp(pkg: String, minutes: Int) {
