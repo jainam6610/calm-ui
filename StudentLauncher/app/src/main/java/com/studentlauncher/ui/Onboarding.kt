@@ -1,6 +1,10 @@
 package com.studentlauncher.ui
 
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import android.widget.VideoView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.spring
@@ -95,6 +99,13 @@ fun OnboardingFlow(vm: LauncherViewModel) {
             }
 
             Spacer(Modifier.height(16.dp))
+            if (step == STEP_DONE) {
+                val ctx = LocalContext.current
+                if (!isDefaultHome(ctx)) {
+                    PillButton("Set as default home", { requestDefaultHome(ctx) }, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (step == STEP_DONE) {
                     PillButton("Get started", { vm.completeOnboarding() }, filled = true, modifier = Modifier.fillMaxWidth())
@@ -209,4 +220,21 @@ private fun DoneStep() {
         Txt("Long-press any app on your new home screen to fine-tune it.", 14f, c.fg2, maxLines = 3)
         Spacer(Modifier.weight(1f))
     }
+}
+
+private fun isDefaultHome(ctx: Context): Boolean =
+    ctx.packageManager.resolveActivity(
+        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+        PackageManager.MATCH_DEFAULT_ONLY
+    )?.activityInfo?.packageName == ctx.packageName
+
+// ponytail: RoleManager home-role dialog on API 29+, default-apps settings below that
+private fun requestDefaultHome(ctx: Context) {
+    val role = if (android.os.Build.VERSION.SDK_INT >= 29) {
+        runCatching {
+            ctx.getSystemService(android.app.role.RoleManager::class.java)
+                ?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
+        }.getOrNull()
+    } else null
+    runCatching { ctx.startActivity(role ?: Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
 }
