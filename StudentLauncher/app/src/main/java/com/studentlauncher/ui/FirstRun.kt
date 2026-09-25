@@ -172,61 +172,34 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
             PillButton("Home", { vm.destination = InternalDestination.Home })
         }
 
-        SettingSection("Focus") {
-            SwitchSetting("Study mode", "Hide apps marked distracting", vm.studyMode, vm::applyStudyMode)
-            SwitchSetting("Mindful Mode", "Escalating pauses + session tracking", vm.mindfulEnabled, vm::applyMindful)
-            AnimatedVisibility(vm.mindfulEnabled) {
-                Column {
-                    SwitchSetting("Escalating pause", "Delay grows each time you open a distracting app", vm.escalatingEnabled, vm::applyEscalating)
-                    SwitchSetting("Session tracking", "Track time in distracting apps", vm.trackingEnabled, vm::applyTracking)
-                    SwitchSetting("Earn your scroll", "Do a quick task to unlock for 10 min", vm.earnScrollEnabled, vm::applyEarnScroll)
-                    Spacer(Modifier.height(6.dp))
-                    Txt("Daily budget: ${vm.dailyBudgetMin} min", 12f, c.fg2)
-                    Segmented(
-                        listOf(30 to "30 min", 60 to "60 min", 90 to "90 min", 120 to "2h"),
-                        vm.dailyBudgetMin,
-                        vm::applyDailyBudget
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    PillButton("Mindful Mode settings", { vm.mindful.settingsOpen = true })
-                    Spacer(Modifier.height(8.dp))
-                    PillButton("App limits", { vm.mindful.appLimitsOpen = true })
-                }
-            }
+        SettingSection("Home", "${vm.pinned.size}/${vm.homeAppLimit} apps") {
+            Txt("Icon style", 12f, c.fg2)
+            Segmented(listOf(IconStyle.Mono to "Mono", IconStyle.Original to "Original"), vm.iconStyle, vm::applyIconStyle)
+            Spacer(Modifier.height(8.dp))
+            Txt("Icon shape", 12f, c.fg2)
+            Segmented(listOf(IconShape.None to "None", IconShape.Circle to "Circle", IconShape.Squircle to "Squircle"), vm.iconShape, vm::applyIconShape)
+            Spacer(Modifier.height(8.dp))
+            Txt("Layout", 12f, c.fg2)
+            Segmented(listOf(HomeLayout.List to "List", HomeLayout.Grid to "Grid"), vm.layout, vm::applyLayout)
+            Spacer(Modifier.height(8.dp))
+            SwitchSetting("Show app names", "Display labels under app icons", vm.showNames, vm::applyShowNames)
+            Spacer(Modifier.height(8.dp))
+            Txt("Home app limit: ${vm.homeAppLimit}", 12f, c.fg2)
             Segmented(
-                listOf(0 to "No pause", 5 to "5 sec", 10 to "10 sec"),
-                vm.pauseSec,
-                vm::applyPauseSec
+                listOf(4 to "4", 6 to "6", 8 to "8", 10 to "10", 12 to "12"),
+                vm.homeAppLimit,
+                vm::applyHomeAppLimit
             )
             Spacer(Modifier.height(8.dp))
-            Txt("Reminder interval", 12f, c.fg2)
-            Segmented(
-                listOf(5 to "5 min", 10 to "10 min", 15 to "15 min"),
-                vm.reminderMin,
-                { v -> vm.applyReminderMin(v); if (v > 0) requestNotifications() }
-            )
+            PillButton("Pick home apps (${vm.pinned.size}/${vm.homeAppLimit})", { vm.pickHomeApps = true })
             Spacer(Modifier.height(8.dp))
-            PillButton("Allow reminders", requestNotifications)
+            Txt("Dock style", 12f, c.fg2)
+            Segmented(listOf(DockStyle.Bottom to "Bottom", DockStyle.Rail to "Rail", DockStyle.Off to "Off"), vm.dockStyle, vm::applyDockStyle)
             Spacer(Modifier.height(8.dp))
-            if (!vm.pinSet) {
-                PillButton("Set a PIN", { vm.requestCreatePin() })
-            } else {
-                SwitchSetting("Protect Study mode with PIN", null, vm.protectStudy, vm::applyProtectStudy)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PillButton("Change PIN", { vm.requestChangePin() }, Modifier.weight(1f))
-                    PillButton("Remove PIN", { vm.requestRemovePin() }, Modifier.weight(1f))
-                }
-            }
+            PillButton("Add or arrange widgets", { vm.widgetCenter = true })
         }
 
-        SettingSection("Appearance") {
-            Segmented(
-                listOf(ThemeMode.Dark to "Dark", ThemeMode.Light to "Light", ThemeMode.System to "Auto"),
-                vm.themeMode,
-                vm::applyTheme
-            )
-            Spacer(Modifier.height(10.dp))
-            Txt("Wallpaper", 12f, c.fg2)
+        SettingSection("Wallpaper", when (vm.wallpaper) { "photo" -> "Custom photo"; "shuffle" -> "Shuffle ${vm.shuffleCount}/5"; else -> vm.wallpaper }) {
             val previews = remember(c.dark) {
                 Wallpapers.presets.map { it to Wallpapers.preset(it, c.dark, 96, 96).asImageBitmap() }
             }
@@ -283,6 +256,16 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
             }
             Spacer(Modifier.height(8.dp))
             PillButton("Adjust wallpaper", { vm.wallpaperEditor = true })
+            Spacer(Modifier.height(8.dp))
+            PillButton("Choose wallpaper", pickPhoto)
+        }
+
+        SettingSection("Appearance", when (vm.themeMode) { ThemeMode.Dark -> "Dark"; ThemeMode.Light -> "Light"; else -> "Auto" }) {
+            Segmented(
+                listOf(ThemeMode.Dark to "Dark", ThemeMode.Light to "Light", ThemeMode.System to "Auto"),
+                vm.themeMode,
+                vm::applyTheme
+            )
             Spacer(Modifier.height(10.dp))
             Txt("Accent", 12f, c.fg2)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -296,54 +279,70 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
                     )
                 }
             }
-            Spacer(Modifier.height(10.dp))
+        }
+
+        SettingSection("Focus") {
+            SwitchSetting("Study mode", "Hide apps marked distracting", vm.studyMode, vm::applyStudyMode)
+            SwitchSetting("Mindful Mode", "Escalating pauses + session tracking", vm.mindfulEnabled, vm::applyMindful)
+            AnimatedVisibility(vm.mindfulEnabled) {
+                Column {
+                    SwitchSetting("Escalating pause", "Delay grows each time you open a distracting app", vm.escalatingEnabled, vm::applyEscalating)
+                    SwitchSetting("Session tracking", "Track time in distracting apps", vm.trackingEnabled, vm::applyTracking)
+                    SwitchSetting("Earn your scroll", "Do a quick task to unlock for 10 min", vm.earnScrollEnabled, vm::applyEarnScroll)
+                    Spacer(Modifier.height(6.dp))
+                    Txt("Daily budget: ${vm.dailyBudgetMin} min", 12f, c.fg2)
+                    Segmented(
+                        listOf(30 to "30 min", 60 to "60 min", 90 to "90 min", 120 to "2h"),
+                        vm.dailyBudgetMin,
+                        vm::applyDailyBudget
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    PillButton("Mindful Mode settings", { vm.mindful.settingsOpen = true })
+                    Spacer(Modifier.height(8.dp))
+                    PillButton("App limits", { vm.mindful.appLimitsOpen = true })
+                }
+            }
+            Segmented(
+                listOf(0 to "No pause", 5 to "5 sec", 10 to "10 sec"),
+                vm.pauseSec,
+                vm::applyPauseSec
+            )
+            Spacer(Modifier.height(8.dp))
+            Txt("Reminder interval", 12f, c.fg2)
+            Segmented(
+                listOf(5 to "5 min", 10 to "10 min", 15 to "15 min"),
+                vm.reminderMin,
+                { v -> vm.applyReminderMin(v); if (v > 0) requestNotifications() }
+            )
+            Spacer(Modifier.height(8.dp))
+            PillButton("Allow reminders", requestNotifications)
+            Spacer(Modifier.height(8.dp))
+            if (!vm.pinSet) {
+                PillButton("Set a PIN", { vm.requestCreatePin() })
+            } else {
+                SwitchSetting("Protect Study mode with PIN", null, vm.protectStudy, vm::applyProtectStudy)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PillButton("Change PIN", { vm.requestChangePin() }, Modifier.weight(1f))
+                    PillButton("Remove PIN", { vm.requestRemovePin() }, Modifier.weight(1f))
+                }
+            }
+        }
+
+        SettingSection("Advanced", "${(vm.motionIntensity * 100).toInt()}% motion") {
             Txt("Font", 12f, c.fg2)
             Segmented(listOf("system" to "System", "serif" to "Serif", "mono" to "Mono"), vm.uiFont, vm::applyUiFont)
             Spacer(Modifier.height(10.dp))
             SwitchSetting("Compact density", "Fit more without changing text size", vm.compactDensity, vm::applyCompactDensity)
-            Txt("Motion", 12f, c.fg2, modifier = Modifier.padding(top = 14.dp))
-            GlassSlider(vm.motionIntensity, vm::applyMotionIntensity)
-        }
-
-        SettingSection("Home Layout") {
-            Txt("Icon style", 12f, c.fg2)
-            Segmented(listOf(IconStyle.Mono to "Mono", IconStyle.Original to "Original"), vm.iconStyle, vm::applyIconStyle)
-            Spacer(Modifier.height(8.dp))
-            Txt("Icon shape", 12f, c.fg2)
-            Segmented(listOf(IconShape.None to "None", IconShape.Circle to "Circle", IconShape.Squircle to "Squircle"), vm.iconShape, vm::applyIconShape)
-            Spacer(Modifier.height(8.dp))
-            Txt("Layout", 12f, c.fg2)
-            Segmented(listOf(HomeLayout.List to "List", HomeLayout.Grid to "Grid"), vm.layout, vm::applyLayout)
-            Spacer(Modifier.height(8.dp))
-            SwitchSetting("Show app names", "Display labels under app icons", vm.showNames, vm::applyShowNames)
-            Spacer(Modifier.height(8.dp))
-            Txt("Home app limit: ${vm.homeAppLimit}", 12f, c.fg2)
-            Segmented(
-                listOf(4 to "4", 6 to "6", 8 to "8", 10 to "10", 12 to "12"),
-                vm.homeAppLimit,
-                vm::applyHomeAppLimit
-            )
-            Spacer(Modifier.height(8.dp))
-            PillButton("Pick home apps (${vm.pinned.size}/${vm.homeAppLimit})", { vm.pickHomeApps = true })
-        }
-
-        SettingSection("Dock & Navigation") {
-            Txt("Dock style", 12f, c.fg2)
-            Segmented(listOf(DockStyle.Bottom to "Bottom", DockStyle.Rail to "Rail", DockStyle.Off to "Off"), vm.dockStyle, vm::applyDockStyle)
             Spacer(Modifier.height(8.dp))
             Txt("Alphabet scrubber", 12f, c.fg2)
             Segmented(listOf(AlphaSide.Right to "Right", AlphaSide.Left to "Left", AlphaSide.Off to "Off"), vm.alphaSide, vm::applyAlphaSide)
-        }
-
-        SettingSection("Home") {
-            PillButton("Add or arrange widgets", { vm.widgetCenter = true })
-            Spacer(Modifier.height(8.dp))
-            PillButton("Choose wallpaper", pickPhoto)
+            Txt("Motion", 12f, c.fg2, modifier = Modifier.padding(top = 14.dp))
+            GlassSlider(vm.motionIntensity, vm::applyMotionIntensity)
             Spacer(Modifier.height(8.dp))
             PillButton("Restart onboarding", vm::resetOnboarding)
         }
 
-        SettingSection("Privacy") {
+        SettingSection("Privacy & About", "On this device") {
             Txt(
                 "Plan, widget, and launcher preferences stay on this device. No account or analytics required.",
                 13f, c.fg2, maxLines = 3
@@ -360,10 +359,13 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
 }
 
 @Composable
-private fun SettingSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingSection(title: String, summary: String? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = LocalColors.current
     Spacer(Modifier.height(18.dp))
-    Txt(title.uppercase(), 11f, c.fg2, FontWeight.Bold)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Txt(title.uppercase(), 11f, c.fg2, FontWeight.Bold, modifier = Modifier.weight(1f))
+        if (summary != null) Txt(summary, 11f, c.fg2)
+    }
     Spacer(Modifier.height(8.dp))
     Column(
         Modifier
