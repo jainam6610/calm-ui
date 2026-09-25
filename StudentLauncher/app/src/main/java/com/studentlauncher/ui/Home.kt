@@ -418,8 +418,7 @@ private fun HomePageContent(
                     vm, wStart, wEnd, compact, areaH * 0.48f,
                     Modifier.fillMaxWidth().weight(1f)
                 )
-                HomeApps(
-                    vm, launchApp, openMenu,
+                Box(
                     Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
@@ -431,12 +430,26 @@ private fun HomePageContent(
                             transformOrigin = TransformOrigin(0f, 1f)
                             depthBlur(p)
                         }
-                        // Cap at 8 visible apps (2 grid rows / 8 list rows) so widgets/clock keep space;
-                        // overflow scrolls inside this window.
-                        .heightIn(max = homeAppsWindowMax(vm))
-                        .verticalScroll(rememberScrollState())
-                        .padding(start = startPad, end = endPad)
-                )
+                ) {
+                    HomeApps(
+                        vm, launchApp, openMenu,
+                        Modifier
+                            .fillMaxWidth()
+                            // Cap at 8 visible apps (2 grid rows / 8 list rows) so widgets/clock keep space;
+                            // overflow scrolls inside this window.
+                            .heightIn(max = homeAppsWindowMax(vm))
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = startPad, end = endPad)
+                    )
+                    if (vm.arrangingApps) {
+                        PillButton(
+                            "Done",
+                            { vm.arrangingApps = false },
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+                            filled = true
+                        )
+                    }
+                }
             }
         }
 

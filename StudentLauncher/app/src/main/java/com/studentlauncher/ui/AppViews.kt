@@ -20,6 +20,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +45,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,6 +68,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -136,7 +139,9 @@ fun AppEntry(
     val s by animateFloatAsState(if (pressed) 0.92f else 1f, Motion.Micro, label = "press")
     var rect by remember { mutableStateOf(Rect.Zero) }
 
-    val gestures = Modifier.combinedClickable(
+    // Arrange mode owns the gestures: hold-lift-drag on the wrapper, no launch/menu races.
+    val arrangingHome = vm.arrangingApps && (mode == EntryMode.List || mode == EntryMode.Grid)
+    val gestures = if (arrangingHome) Modifier else Modifier.combinedClickable(
         interactionSource = src,
         indication = null,
         onClick = { onLaunch(app, rect) },
@@ -192,14 +197,74 @@ fun HomeApps(
     onMenu: (AppInfo, Rect) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (vm.layout == com.studentlauncher.data.HomeLayout.Grid) {
-        val list = vm.pinned.mapNotNull { vm.appFor(it) }.filter { vm.isVisible(it) }
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val grid = vm.layout == com.studentlauncher.data.HomeLayout.Grid
+    val arranging = vm.arrangingApps
+    fun visibleList() = vm.pinned.mapNotNull { vm.appFor(it) }.filter { vm.isVisible(it) }
+    val list = visibleList()
+    var dragPkg by remember { mutableStateOf<String?>(null) }
+    var startIdx by remember { mutableIntStateOf(0) }
+    var dx by remember { mutableFloatStateOf(0f) }
+    var dy by remember { mutableFloatStateOf(0f) }
+    var cellW by remember { mutableFloatStateOf(1f) }
+    var cellH by remember { mutableFloatStateOf(1f) }
+    val launchGate: (AppInfo, Rect) -> Unit = { a, r -> if (!arranging) onLaunch(a, r) }
+
+    fun onDrag(drag: Offset) {
+        val pkg = dragPkg ?: return
+        dx += drag.x
+        dy += drag.y
+        val cur = visibleList()
+        val i = cur.indexOfFirst { it.pkg == pkg }
+        if (i < 0) return
+        val rowPx = (cellH + if (grid) with(density) { 10.dp.toPx() } else 0f).coerceAtLeast(1f)
+        val rowStep = Math.round(dy / rowPx)
+        val colStep = if (grid) Math.round(dx / cellW) else 0
+        val target = (startIdx + rowStep * if (grid) 4 else 1 + colStep).coerceIn(0, cur.size - 1)
+        if (target != i) {
+            vm.movePinned(pkg, cur[target].pkg, after = target > i)
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+
+    // In rearrange mode a hold-then-drag lifts the app; plain swipes still scroll.
+    fun cellMod(pkg: String) = Modifier
+        .onSizeChanged {
+            cellW = it.width.toFloat().coerceAtLeast(1f)
+            cellH = it.height.toFloat().coerceAtLeast(1f)
+        }
+        .graphicsLayer {
+            if (dragPkg == pkg) {
+                translationX = dx
+                translationY = dy
+                scaleX = 1.06f
+                scaleY = 1.06f
+                shadowElevation = 10.dp.toPx()
+            }
+        }
+        .pointerInput(pkg, arranging, grid) {
+            if (!arranging) return@pointerInput
+            detectDragGesturesAfterLongPress(
+                onDragStart = {
+                    dragPkg = pkg
+                    startIdx = visibleList().indexOfFirst { it.pkg == pkg }
+                    dx = 0f
+                    dy = 0f
+                },
+                onDragEnd = { dragPkg = null },
+                onDragCancel = { dragPkg = null },
+                onDrag = { _, drag -> onDrag(drag) }
+            )
+        }
+
+    if (grid) {
         Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             list.chunked(4).forEach { rowApps ->
                 Row(Modifier.fillMaxWidth()) {
                     rowApps.forEach { a ->
-                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            AppEntry(a, vm, EntryMode.Grid, onLaunch, onMenu)
+                        Box(Modifier.weight(1f).then(cellMod(a.pkg)), contentAlignment = Alignment.Center) {
+                            AppEntry(a, vm, EntryMode.Grid, launchGate, onMenu)
                         }
                     }
                     repeat(4 - rowApps.size) { Spacer(Modifier.weight(1f)) }
@@ -216,7 +281,9 @@ fun HomeApps(
                             visible = vm.isVisible(a),
                             enter = fadeIn(Motion.Macro) + expandVertically(Motion.Size),
                             exit = fadeOut() + shrinkVertically(Motion.Size)
-                        ) { AppEntry(a, vm, EntryMode.List, onLaunch, onMenu) }
+                        ) {
+                            Box(cellMod(pkg)) { AppEntry(a, vm, EntryMode.List, launchGate, onMenu) }
+                        }
                     }
                 }
             }

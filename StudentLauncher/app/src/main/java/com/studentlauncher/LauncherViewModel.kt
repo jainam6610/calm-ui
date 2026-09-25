@@ -133,6 +133,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var resizeHintShown = false
     var wallpaperEditor by mutableStateOf(false)
     var pickHomeApps by mutableStateOf(false)
+    var arrangingApps by mutableStateOf(false)
     var aboutOpen by mutableStateOf(false)
     var activeBrainTask by mutableStateOf<String?>(null)
     val planTasks = mutableStateListOf<PlanTask>().apply { addAll(parsePlanTasks(prefs.getString("plan_tasks", "") ?: "")) }
@@ -254,6 +255,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (pkg in pinned) pinned.remove(pkg)
         else if (pinned.size >= homeAppLimit) toast = "Home holds $homeAppLimit apps"
         else pinned.add(pkg)
+        saveCsv("pinned", pinned)
+    }
+
+    /** Drag-rearrange: move [dragged] next to [target] in pinned order (display order mirrors pinned among visible apps). */
+    fun movePinned(dragged: String, target: String, after: Boolean) {
+        val from = pinned.indexOf(dragged)
+        if (from < 0) return
+        pinned.removeAt(from)
+        val to = pinned.indexOf(target)
+        if (to < 0) pinned.add(if (after) pinned.size else 0, dragged)
+        else pinned.add(if (after) to + 1 else to, dragged)
         saveCsv("pinned", pinned)
     }
 

@@ -150,6 +150,12 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
         val pinned = app.pkg in vm.pinned
         val docked = app.pkg in vm.dock
         CtxItem(if (pinned) "Remove from home" else "Pin to home") { visible.targetState = false; vm.togglePin(app.pkg) }
+        if (pinned) CtxItem("Rearrange apps") {
+            visible.targetState = false
+            vm.selectedWidgetId = null
+            vm.arrangingApps = true
+            vm.toast = "Hold an app, then drag to rearrange"
+        }
         CtxItem(if (docked) "Remove from dock" else "Add to dock") { visible.targetState = false; vm.toggleDock(app.pkg) }
         CtxItem(if (app.pkg in vm.flagged) "Not distracting" else "Mark as distracting") { visible.targetState = false; vm.toggleFlag(app.pkg) }
         CtxItem(if (app.pkg in vm.studyApps) "Not a study app" else "Mark as study app") { visible.targetState = false; vm.toggleStudyApp(app.pkg) }
