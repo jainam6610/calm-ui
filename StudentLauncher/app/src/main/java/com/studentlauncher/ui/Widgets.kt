@@ -55,6 +55,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +85,7 @@ import com.studentlauncher.data.WidgetItem
 import com.studentlauncher.mindful.ui.MindfulTodayContent
 import com.studentlauncher.mindful.ui.MindfulWeekContent
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -215,11 +217,20 @@ private fun Appear(content: @Composable () -> Unit) {
 fun Widgets(vm: LauncherViewModel, padStart: Dp, padEnd: Dp, compact: Boolean, maxH: Dp, modifier: Modifier) {
     val c = LocalColors.current
     val rows = buildRows(vm.homeWidgets.toList())
+    val scroll = rememberScrollState()
+    // Scrolling away means the user is browsing again, not editing — dismiss the selection
+    // at the first movement away from the position it was made at.
+    LaunchedEffect(vm.selectedWidgetId, scroll) {
+        val sel = vm.selectedWidgetId ?: return@LaunchedEffect
+        val anchor = scroll.value
+        snapshotFlow { scroll.value }.first { it != anchor }
+        if (vm.selectedWidgetId == sel) vm.selectedWidgetId = null
+    }
     Column(
         modifier
             .fillMaxWidth()
             .heightIn(max = maxH)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(start = padStart, end = padEnd),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -280,173 +291,147 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
     val haptic = LocalHapticFeedback.current
     val fg = toneColor(w.tone, c)
     val fg2 = fg.copy(alpha = 0.6f)
-    var showMenu by remember { mutableStateOf(false) }
+    val selected = vm.selectedWidgetId == w.id
+    // Home-only selection accent: Board draws its own border block (W4), so a second
+    // unconditional accent source here would double it. The guard is the point.
+    val onBoard = vm.boardWidgets.any { it.id == w.id }
+    val stroke = if (selected && !onBoard) c.accent.copy(alpha = 0.6f) else c.fg2.copy(alpha = 0.22f)
+
+    fun moveVert(delta: Int) {
+        val i = vm.boardWidgets.indexOfFirst { it.id == w.id }
+        if (i >= 0) { // Board → row-aware, skips half-pair partners
+            val (up, down) = boardVerticalNeighbors(vm.boardWidgets.toList(), i)
+            val t = if (delta < 0) up else down
+            if (t == null) return // boundary no-op — no haptic
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            vm.reorderBoardWidget(i, t)
+            return
+        }
+        val hi = vm.homeWidgets.indexOfFirst { it.id == w.id }
+        if (hi < 0 || hi + delta !in vm.homeWidgets.indices) return // mirrors moveWidget bounds check
+        vm.moveWidget(w.id, delta)
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
 
     Column(Modifier.fillMaxWidth().animateContentSize(Motion.Size)) {
-        // Widget content with long-press for context menu
+        if (selected) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SelChip("↑", Modifier.width(48.dp)) { moveVert(-1) }
+                SelChip("↓", Modifier.width(48.dp)) { moveVert(1) }
+                SelChip("Edit", Modifier.weight(1f)) { vm.editWidgetId = w.id }
+                SelChip("Remove", Modifier.weight(1f), danger = true) { vm.removeWidget(w.id) }
+                SelChip("Done", Modifier.weight(1f), filled = true) { vm.selectedWidgetId = null }
+            }
+        }
+        // Widget content with long-press to select
         Box(
             Modifier
                 .fillMaxWidth()
                 .then(
                     when (w.bg) {
-                        WidgetBg.Glass -> Modifier.glass(12.dp).border(1.dp, c.fg2.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
-                        WidgetBg.Solid -> Modifier.clip(RoundedCornerShape(12.dp)).background(if (c.dark) Color(0xFF1C1C1E) else Color.White).border(1.dp, c.fg2.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
-                        WidgetBg.None -> Modifier
+                        WidgetBg.Glass -> Modifier.glass(12.dp).border(1.dp, stroke, RoundedCornerShape(12.dp))
+                        WidgetBg.Solid -> Modifier.clip(RoundedCornerShape(12.dp)).background(if (c.dark) Color(0xFF1C1C1E) else Color.White).border(1.dp, stroke, RoundedCornerShape(12.dp))
+                        WidgetBg.None -> if (selected && !onBoard) Modifier.border(1.dp, stroke, RoundedCornerShape(12.dp)) else Modifier
                     }
                 )
                 .pointerInput(w.id) {
                     detectTapGestures(onLongPress = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        showMenu = true
+                        vm.selectedWidgetId = w.id
                     })
                 }
                 .padding(if (w.bg == WidgetBg.None) 6.dp else 12.dp)
         ) {
             Column { content(fg, fg2) }
-        }
-
-        // Resize strip: claim only after past-touch-slop movement (parent scroll may take it first).
-        // Vertical = height steps; horizontal = Full/Half width (drag left = half, right = full).
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .pointerInput(w.id, w.height, w.half) {
-                    while (true) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val slop = viewConfiguration.touchSlop
-                            val startX = down.position.x
-                            val startY = down.position.y
-                            var axis = 0 // 0 none, 1 vertical, 2 horizontal
-                            var accumV = 0f
-                            var accumH = 0f
-                            do {
-                                val ev = awaitPointerEvent()
-                                val ch = ev.changes.first()
-                                if (!ch.pressed) break
-                                if (axis == 0) {
-                                    if (ch.isConsumed) continue // parent scroll took it
-                                    val dx = ch.position.x - startX
-                                    val dy = ch.position.y - startY
-                                    if (abs(dx) > slop || abs(dy) > slop) {
-                                        axis = if (abs(dx) > abs(dy)) 2 else 1
-                                        if (axis == 1) accumV = if (dy > 0f) dy - slop else dy + slop
-                                        else accumH = if (dx > 0f) dx - slop else dx + slop
+            if (selected) {
+                // Resize handle: one gesture, both axes. Claims on the first slop-crossing of
+                // either axis; leaf runs before parent scroll / Board drag / HorizontalPager.
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .size(44.dp)
+                        .pointerInput(w.id) { // w.id ONLY — a height/half key would cancel mid-drag
+                            awaitEachGesture {
+                                var accumV = 0f
+                                var accumH = 0f
+                                var markV = 0
+                                var claimed = false
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                val slop = viewConfiguration.touchSlop
+                                val startX = down.position.x
+                                val startY = down.position.y
+                                val stepPx = 36.dp.toPx()
+                                val flipPx = 40.dp.toPx()
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    val ch = ev.changes.first()
+                                    if (!ch.pressed) break
+                                    if (!claimed) {
+                                        if (ch.isConsumed) continue // another gesture took it
+                                        val dx = ch.position.x - startX
+                                        val dy = ch.position.y - startY
+                                        if (abs(dx) <= slop && abs(dy) <= slop) continue
+                                        accumV = if (dy > 0f) dy - slop else dy + slop
+                                        accumH = if (dx > 0f) dx - slop else dx + slop
+                                        claimed = true
+                                        ch.consume()
+                                    } else {
+                                        accumV += ch.position.y - ch.previousPosition.y
+                                        accumH += ch.position.x - ch.previousPosition.x
                                         ch.consume()
                                     }
-                                } else {
-                                    accumV += ch.position.y - ch.previousPosition.y
-                                    accumH += ch.position.x - ch.previousPosition.x
-                                    ch.consume()
-                                }
-                            } while (ev.changes.any { it.pressed })
-                            when (axis) {
-                                1 -> {
-                                    val steps = (accumV / 36f).toInt()
-                                    if (steps != 0) {
-                                        val newH = (w.height + steps).coerceIn(1, 3)
-                                        if (newH != w.height) {
+
+                                    // Live commit: one per step, so each step haptics and the
+                                    // running gesture must survive the recomposition it causes.
+                                    val cur = vm.findWidget(w.id) ?: break
+                                    val steps = (accumV / stepPx).toInt()
+                                    if (steps != markV) {
+                                        val newH = (cur.height + steps - markV).coerceIn(1, 3)
+                                        if (newH != cur.height) {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             vm.setWidgetHeight(w.id, newH)
                                         }
+                                        markV = steps // advance even at the clamp, else drag-back never applies
                                     }
-                                }
-                                2 -> {
-                                    if (abs(accumH) > 36f) {
-                                        val newHalf = accumH < 0f
-                                        if (newHalf != w.half) {
+                                    if (abs(accumH) > flipPx) {
+                                        val want = accumH < 0f // drag left = half, right = full
+                                        if (want != cur.half) {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            vm.updateWidget(w.id) { it.copy(half = newHalf) }
+                                            vm.updateWidget(w.id) { it.copy(half = want) }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                Modifier
-                    .width(36.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(c.fg2.copy(alpha = 0.4f))
-            )
-        }
-
-        if (showMenu) {
-            WidgetContextMenu(
-                w = w,
-                onEdit = { vm.editWidgetId = w.id; showMenu = false },
-                onRemove = { vm.removeWidget(w.id); showMenu = false },
-                onSize = { h -> vm.setWidgetHeight(w.id, h); showMenu = false },
-                onWidth = { half -> vm.updateWidget(w.id) { it.copy(half = half) }; showMenu = false },
-                onDismiss = { showMenu = false }
-            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(c.fg2.copy(alpha = 0.4f))
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun WidgetContextMenu(
-    w: WidgetItem,
-    onEdit: () -> Unit,
-    onRemove: () -> Unit,
-    onSize: (Int) -> Unit,
-    onWidth: (Boolean) -> Unit,
-    onDismiss: () -> Unit
-) {
+private fun SelChip(label: String, modifier: Modifier, danger: Boolean = false, filled: Boolean = false, onClick: () -> Unit) {
     val c = LocalColors.current
-    val haptic = LocalHapticFeedback.current
-    val labels = listOf(1 to "Small", 2 to "Medium", 3 to "Tall")
-    val widths = listOf(false to "Full", true to "Half")
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Column(
-            Modifier
-                .align(Alignment.Center)
-                .width(180.dp)
-                .glass(20.dp)
-                .padding(8.dp)
-                .pointerInput(Unit) { detectTapGestures {} }
-        ) {
-            CtxMenuRow("Edit") { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onEdit() }
-            CtxMenuRow("Remove", danger = true) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onRemove() }
-            Txt("Size", 11f, c.fg2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                labels.forEach { (h, label) ->
-                    val selected = w.height == h
-                    Box(
-                        Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(8.dp))
-                            .background(if (selected) c.fg else c.track)
-                            .tap { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSize(h) },
-                        contentAlignment = Alignment.Center
-                    ) { Txt(label, 11f, if (selected) c.knobOn else c.fg) }
-                }
-            }
-            Txt("Width", 11f, c.fg2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                widths.forEach { (half, label) ->
-                    val selected = w.half == half
-                    Box(
-                        Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(8.dp))
-                            .background(if (selected) c.fg else c.track)
-                            .tap { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onWidth(half) },
-                        contentAlignment = Alignment.Center
-                    ) { Txt(label, 11f, if (selected) c.knobOn else c.fg) }
-                }
-            }
-        }
+    val bg = if (filled) c.fg else c.track
+    val fg = when {
+        filled -> c.knobOn
+        danger -> c.accent
+        else -> c.fg
     }
-}
-
-@Composable
-private fun CtxMenuRow(label: String, danger: Boolean = false, onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp)).tap(onClick = onClick).padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart
-    ) { Txt(label, 14f, if (danger) LocalColors.current.accent else LocalColors.current.fg) }
+        modifier.height(44.dp).clip(RoundedCornerShape(12.dp)).background(bg).tap(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Txt(label, 13f, fg) }
 }
 
 @Composable

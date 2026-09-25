@@ -2,8 +2,6 @@ package com.studentlauncher.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -101,12 +99,15 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
     val itemHeights = remember { mutableStateMapOf<String, Float>() }
     var dragId by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
-    val editingId = vm.boardEditingId
+    val editingId = vm.selectedWidgetId
+    // The selected widget may live on Home while this page is visible — only lock scroll
+    // when the selection actually belongs to this board.
+    val selOnBoard = editingId != null && vm.boardWidgets.any { it.id == editingId }
 
     LazyColumn(
         modifier = modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        userScrollEnabled = editingId == null && dragId == null
+        userScrollEnabled = !selOnBoard && dragId == null
     ) {
         item {
             Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -114,9 +115,9 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
                 PillButton("Add", { vm.widgetTargetHome = false; vm.widgetTab = 0; vm.widgetCenter = true }, Modifier.semantics { contentDescription = "Add widget" })
             }
             if (editingId != null) {
-                Txt("Editing — drag to reorder, Done to finish", 11f, c.accent, modifier = Modifier.padding(top = 4.dp))
+                Txt("Selected — drag to reorder, Done to finish", 11f, c.accent, modifier = Modifier.padding(top = 4.dp))
             } else {
-                Txt("Hold a widget for 1 second to edit", 11f, c.fg2, modifier = Modifier.padding(top = 4.dp))
+                Txt("Long-press a widget to edit", 11f, c.fg2, modifier = Modifier.padding(top = 4.dp))
             }
         }
         if (vm.boardWidgets.isEmpty()) item {
@@ -144,12 +145,6 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
                             isEditing = isEditing,
                             isDragging = isDragging,
                             dragOffset = if (isDragging) dragOffset else 0f,
-                            onHoldEdit = {
-                                if (!isEditing) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    vm.boardEditingId = item.id
-                                }
-                            },
                             onDragStart = { dragId = item.id; dragOffset = 0f },
                             onDrag = { dy ->
                                 dragOffset += dy
@@ -176,8 +171,7 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
                                     swapped = true
                                 }
                             },
-                            onDragEnd = { dragId = null; dragOffset = 0f },
-                            onDone = { if (editingId == item.id) vm.boardEditingId = null }
+                            onDragEnd = { dragId = null; dragOffset = 0f }
                         )
                     }
                 }
@@ -194,24 +188,11 @@ private fun BoardWidget(
     isEditing: Boolean,
     isDragging: Boolean,
     dragOffset: Float,
-    onHoldEdit: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onDone: () -> Unit
+    onDragEnd: () -> Unit
 ) {
     val c = LocalColors.current
-    val haptic = LocalHapticFeedback.current
-
-    fun verticalMove(delta: Int) {
-        val list = vm.boardWidgets.toList()
-        val idx = list.indexOfFirst { it.id == item.id }
-        val target = if (delta < 0) boardVerticalNeighbors(list, idx).first else boardVerticalNeighbors(list, idx).second
-        if (target != null) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            vm.reorderBoardWidget(idx, target)
-        }
-    }
 
     Column(
         Modifier
@@ -239,52 +220,12 @@ private fun BoardWidget(
                         onDragCancel = { onDragEnd() },
                         onDrag = { _, drag -> onDrag(drag.y) }
                     )
-                } else {
-                    // 1s hold to edit: never consume — scroll/tap pass through untouched.
-                    // while(true) re-arms after a failed first gesture (tap/scroll).
-                    while (true) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val slop = viewConfiguration.touchSlop
-                            val startX = down.position.x
-                            val startY = down.position.y
-                            val startNs = System.nanoTime()
-                            while (true) {
-                                val ev = awaitPointerEvent()
-                                if (ev.changes.none { it.pressed }) break
-                                val ch = ev.changes.first()
-                                val dx = ch.position.x - startX
-                                val dy = ch.position.y - startY
-                                if (dx * dx + dy * dy > slop * slop) break // scrolled
-                                if (System.nanoTime() - startNs >= 1_000_000_000L) {
-                                    onHoldEdit()
-                                    break
-                                }
-                            }
-                        }
-                    }
                 }
+                // Not selected → no drag node here: WidgetFrame's long-press selects,
+                // so scroll/tap/Pager pass through untouched.
             }
             .padding(if (isEditing) 8.dp else 0.dp)
     ) {
-        if (isEditing) {
-            Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Txt(WT.title(item.type), 13f, c.fg, FontWeight.Medium)
-                    Txt("Drag or use arrows", 11f, c.fg2)
-                }
-                PillButton("↑", { verticalMove(-1) }, Modifier.size(48.dp).semantics { contentDescription = "Move ${WT.title(item.type)} up" })
-                PillButton("↓", { verticalMove(1) }, Modifier.size(48.dp).semantics { contentDescription = "Move ${WT.title(item.type)} down" })
-                PillButton(
-                    if (item.half) "½" else "Full",
-                    { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); vm.updateWidget(item.id) { it.copy(half = !it.half) } },
-                    Modifier.size(48.dp).semantics { contentDescription = "Toggle width" }
-                )
-                Spacer(Modifier.width(6.dp))
-                PillButton("Done", onDone, Modifier.height(48.dp), filled = true)
-            }
-            // Edit sheet (settings) still reachable via long-press menu on the widget body
-        }
         WidgetBody(item, vm, compact = vm.compactDensity)
     }
 }

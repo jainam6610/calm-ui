@@ -129,6 +129,8 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                 listOf(WidgetBg.Glass to "Glass", WidgetBg.Solid to "Solid", WidgetBg.None to "None"),
                 w.bg, { v -> vm.updateWidget(id) { it.copy(bg = v) } }
             )
+            SLabel("Height")
+            Segmented(listOf(1 to "Small", 2 to "Medium", 3 to "Tall"), w.height, { v -> vm.setWidgetHeight(id, v) })
             SLabel("Width")
             Segmented(listOf(false to "Full", true to "Half"), w.half, { v -> vm.updateWidget(id) { it.copy(half = v) } })
             SLabel("Text color")

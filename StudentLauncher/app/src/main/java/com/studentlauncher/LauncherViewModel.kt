@@ -126,7 +126,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var widgetCenter by mutableStateOf(false)
     var widgetTab by mutableStateOf(0)
     var editWidgetId by mutableStateOf<String?>(null)
-    var boardEditingId by mutableStateOf<String?>(null)
+    var selectedWidgetId by mutableStateOf<String?>(null)
     var wallpaperEditor by mutableStateOf(false)
     var pickHomeApps by mutableStateOf(false)
     var aboutOpen by mutableStateOf(false)
@@ -215,7 +215,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         aboutOpen = false
         wallpaperEditor = false
         pickHomeApps = false
-        boardEditingId = null
+        selectedWidgetId = null
         activeBrainTask = null
         destination = InternalDestination.Home
         mindful.cancelDoor(false)
@@ -232,7 +232,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             aboutOpen -> aboutOpen = false
             editWidgetId != null -> editWidgetId = null
             widgetCenter -> widgetCenter = false
-            boardEditingId != null -> boardEditingId = null
+            selectedWidgetId != null -> selectedWidgetId = null
             activeBrainTask != null -> activeBrainTask = null
             ctxApp != null -> ctxApp = null
             pinRequest != null -> pinRequest = null
@@ -417,7 +417,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (w.type == WT.ANDROID) w.get("appWidgetId").toIntOrNull()?.let { hostMgr.release(it) }
         list.remove(w)
         if (editWidgetId == id) editWidgetId = null
-        if (boardEditingId == id) boardEditingId = null
+        if (selectedWidgetId == id) selectedWidgetId = null
         if (list === homeWidgets) saveHomeWidgets() else saveBoardWidgets()
     }
 
