@@ -127,6 +127,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var widgetTab by mutableStateOf(0)
     var editWidgetId by mutableStateOf<String?>(null)
     var selectedWidgetId by mutableStateOf<String?>(null)
+    /** Root-space bottom of the selected widget's frame — Widgets() uses it to reveal a clipped corner. */
+    var frameBottomPx by mutableStateOf(0f)
     /** Session-only: one resize-hint toast per app run, not persisted. */
     var resizeHintShown = false
     var wallpaperEditor by mutableStateOf(false)

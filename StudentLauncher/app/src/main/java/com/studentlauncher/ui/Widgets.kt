@@ -20,6 +20,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -62,6 +63,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -220,16 +223,23 @@ fun Widgets(vm: LauncherViewModel, padStart: Dp, padEnd: Dp, compact: Boolean, m
     val c = LocalColors.current
     val rows = buildRows(vm.homeWidgets.toList())
     val scroll = rememberScrollState()
-    // Scrolling away means the user is browsing again, not editing — dismiss the selection
-    // at the first movement away from the position it was made at.
+    val arrangeHome = vm.selectedWidgetId != null && vm.homeWidgets.any { it.id == vm.selectedWidgetId }
+    var viewBottom by remember { mutableFloatStateOf(Float.MAX_VALUE) }
+    // Selection first reveals: a frame corner under the window clip scrolls into view,
+    // then the scroll-away exit arms from the settled position (so the reveal itself
+    // never counts as the user browsing away).
     LaunchedEffect(vm.selectedWidgetId, scroll) {
         val sel = vm.selectedWidgetId ?: return@LaunchedEffect
+        val over = vm.frameBottomPx - viewBottom + 20f
+        if (over > 0f && viewBottom < Float.MAX_VALUE) scroll.animateScrollBy(over)
         val anchor = scroll.value
         snapshotFlow { scroll.value }.first { it != anchor }
         if (vm.selectedWidgetId == sel) vm.selectedWidgetId = null
     }
-    val arrangeHome = vm.selectedWidgetId != null && vm.homeWidgets.any { it.id == vm.selectedWidgetId }
-    Box(modifier.fillMaxWidth().heightIn(max = maxH)) {
+    Box(
+        modifier.fillMaxWidth().heightIn(max = maxH)
+            .onGloballyPositioned { viewBottom = it.boundsInRoot().bottom }
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -313,6 +323,8 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
         Box(
             Modifier
                 .fillMaxWidth()
+                // Reveal math: Widgets() reads this to scroll a clipped corner into view.
+                .onGloballyPositioned { vm.frameBottomPx = it.boundsInRoot().bottom }
                 .then(
                     when (w.bg) {
                         WidgetBg.Glass -> Modifier.glass(12.dp).border(1.dp, stroke, RoundedCornerShape(12.dp))
