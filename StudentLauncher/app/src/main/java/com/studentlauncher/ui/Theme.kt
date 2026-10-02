@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -119,6 +120,12 @@ fun accentColor(id: String): Color = when (id) {
 fun fontFamilyOf(id: String): FontFamily = when (id) {
     "serif" -> FontFamily.Serif
     "mono" -> FontFamily.Monospace
+    // OFL fonts bundled in res/font (see app/OFL-POPPINS.txt)
+    "poppins" -> FontFamily(
+        Font(com.studentlauncher.R.font.poppins_light, FontWeight.Light),
+        Font(com.studentlauncher.R.font.poppins_regular, FontWeight.Normal),
+        Font(com.studentlauncher.R.font.poppins_medium, FontWeight.Medium)
+    )
     else -> FontFamily.Default
 }
 

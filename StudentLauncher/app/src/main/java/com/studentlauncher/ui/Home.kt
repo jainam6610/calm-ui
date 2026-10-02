@@ -119,7 +119,7 @@ fun LauncherRoot(
             val slot = vm.shuffleSlot
             set = withContext(Dispatchers.Default) { Wallpapers.build(ctx, id, dark, wPx, hPx, adj, slot) }
         }
-        val env = remember(set, dark) { GlassEnv(set?.blurred, dark) }
+        val env = remember(set, dark) { GlassEnv(set?.blurred, dark, wPx) }
 
         CompositionLocalProvider(
             LocalColors provides colors,

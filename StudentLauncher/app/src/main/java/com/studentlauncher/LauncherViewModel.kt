@@ -57,6 +57,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var iconShape by mutableStateOf(enumPref("iconShape", IconShape.Squircle)); private set
     var layout by mutableStateOf(enumPref("layout", HomeLayout.List)); private set
     var alphaSide by mutableStateOf(enumPref("alphaSide", AlphaSide.Right)); private set
+    var normalScroll by mutableStateOf(prefs.getBoolean("normalScroll", false)); private set
     var dockStyle by mutableStateOf(enumPref("dockStyle", DockStyle.Bottom)); private set
     var showNames by mutableStateOf(prefs.getBoolean("showNames", true)); private set
     var studyMode by mutableStateOf(prefs.getBoolean("studyMode", false)); private set
@@ -116,6 +117,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var view by mutableStateOf(ViewMode.Home)
     var letter by mutableStateOf('A')
     var letterDir by mutableStateOf(1)
+    /** Bumps on every scrubber letter press so re-tapping the current letter still re-scrolls. */
+    var scrubTick by mutableStateOf(0)
     var query by mutableStateOf("")
     var chip by mutableStateOf(Chip.All)
     var ctxApp by mutableStateOf<AppInfo?>(null)
@@ -185,6 +188,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun availableLetters(): Set<Char> = pool().map { letterOf(it.label) }.toSet()
 
+    fun groupedApps(): List<Pair<Char, List<AppInfo>>> =
+        pool().groupBy { letterOf(it.label) }.toSortedMap().toList()
+
     fun appsForKey(key: String): List<AppInfo> {
         val q = query.trim().lowercase()
         return if (key == "q") pool().filter { it.label.lowercase().contains(q) }
@@ -198,6 +204,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             27 -> Unit
             else -> {
                 val l = 'A' + (i - 1)
+                scrubTick++
                 if (view != ViewMode.All || l != letter || query.isNotEmpty()) {
                     letterDir = if (l >= letter) 1 else -1
                     letter = l
@@ -621,6 +628,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun applyIconShape(v: IconShape) { iconShape = v; putS("iconShape", v.name) }
     fun applyLayout(v: HomeLayout) { layout = v; putS("layout", v.name) }
     fun applyAlphaSide(v: AlphaSide) { alphaSide = v; putS("alphaSide", v.name) }
+    fun applyNormalScroll(v: Boolean) { normalScroll = v; putB("normalScroll", v) }
     fun applyDockStyle(v: DockStyle) { dockStyle = v; putS("dockStyle", v.name) }
     fun applyShowNames(v: Boolean) { showNames = v; putB("showNames", v) }
     fun applyStudyMode(v: Boolean) { studyMode = v; putB("studyMode", v) }

@@ -1,8 +1,12 @@
 package com.studentlauncher.ui
 
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.BitmapFactory
 import android.os.BatteryManager
+import android.os.StatFs
 import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
@@ -18,6 +22,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -67,19 +72,25 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,8 +100,11 @@ import com.studentlauncher.data.WidgetBg
 import com.studentlauncher.data.WidgetItem
 import com.studentlauncher.mindful.ui.MindfulTodayContent
 import com.studentlauncher.mindful.ui.MindfulWeekContent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -104,6 +118,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 // ---------------------------------------------------------------------------------------------
 // Dot-matrix helpers (Nothing style, drawn on canvas so no font is needed)
@@ -157,8 +172,10 @@ fun rememberNow(): LocalDateTime {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
-            now = LocalDateTime.now()
-            delay(60_000L - (System.currentTimeMillis() % 60_000L) + 50L)
+            // ponytail: sample every second so wake/clock-jumps correct fast; truncated to the
+            // minute so structural equality only recomposes consumers on minute change
+            now = LocalDateTime.now().withSecond(0).withNano(0)
+            delay(minOf(60_000L - (System.currentTimeMillis() % 60_000L) + 50L, 1_000L))
         }
     }
     return now
@@ -547,6 +564,10 @@ fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, c
             WT.ASSIGNMENTS -> AssignmentsContent(w, vm, fg, fg2, accent)
             WT.MINDFUL_TODAY -> MindfulTodayContent(vm, fg, fg2, accent)
             WT.MINDFUL_WEEK -> MindfulWeekContent(vm, fg, fg2, accent)
+            WT.MONITOR -> MonitorContent(fg, fg2, accent)
+            WT.QUOTES -> QuotesContent(w, fg, fg2, accent)
+            WT.EVENTS -> EventsContent(fg, fg2, accent)
+            WT.PHOTOS -> PhotosContent(fg, fg2)
         }
     }
 }
@@ -561,7 +582,7 @@ private fun ClockContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
     val ctx = LocalContext.current
     val sys24 = remember { DateFormat.is24HourFormat(ctx) }
     val is24 = when (w.get("fmt", "sys")) { "24" -> true; "12" -> false; else -> sys24 }
-    val time = now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "hh:mm"))
+    val time = now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a"))
     var q by remember { mutableIntStateOf(0) }
     when (w.get("style", "Dot")) {
         "Digital" -> Txt(time, 54f, fg, FontWeight.Light)
@@ -658,6 +679,7 @@ private fun FlipClock(now: LocalDateTime, is24: Boolean, fg: Color, accent: Colo
         FlipCard(h, fg, accent, flap)
         Txt(":", 40f, fg, FontWeight.Bold)
         FlipCard(m, fg, accent, flap)
+        if (!is24) Txt(if (now.hour < 12) "AM" else "PM", 14f, fg, FontWeight.Medium)
     }
 }
 
@@ -778,6 +800,184 @@ private fun BatteryContent(fg: Color, accent: Color) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Monitor / Quotes / Events / Photos (Nothing-OS style, recreated — no external assets)
+// ---------------------------------------------------------------------------------------------
+
+/** cpu -times as (idle, total) jiffies, or null when the OEM blocks /proc/stat. */
+private fun readCpuTimes(): Pair<Long, Long>? = runCatching {
+    val t = File("/proc/stat").readLines().firstOrNull()!!.split(Regex("\\s+")).drop(1).map { it.toLong() }
+    (t[3] + t.getOrElse(4) { 0L }) to t.sum()
+}.getOrNull()
+
+private fun swapUsedPct(): Int = runCatching {
+    var total = 0L
+    var free = 0L
+    File("/proc/meminfo").forEachLine { l ->
+        if (l.startsWith("SwapTotal:")) total = l.split(Regex("\\s+"))[1].toLong()
+        else if (l.startsWith("SwapFree:")) free = l.split(Regex("\\s+"))[1].toLong()
+    }
+    if (total <= 0L) -1 else ((total - free) * 100 / total).toInt()
+}.getOrDefault(-1)
+
+@Composable
+private fun MonitorContent(fg: Color, fg2: Color, accent: Color) {
+    val ctx = LocalContext.current
+    var ram by remember { mutableIntStateOf(0) }
+    var swap by remember { mutableIntStateOf(-1) }
+    var storage by remember { mutableIntStateOf(0) }
+    var cpu by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(Unit) {
+        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val mi = ActivityManager.MemoryInfo()
+        var prev = readCpuTimes()
+        while (true) {
+            am.getMemoryInfo(mi)
+            ram = ((1.0 - mi.availMem.toDouble() / mi.totalMem) * 100).toInt().coerceIn(0, 100)
+            swap = swapUsedPct()
+            runCatching {
+                val sf = StatFs(ctx.dataDir.path)
+                storage = ((1.0 - sf.availableBytes.toDouble() / sf.totalBytes) * 100).toInt().coerceIn(0, 100)
+            }
+            delay(2000)
+            val cur = readCpuTimes()
+            cpu = if (prev != null && cur != null && cur.second > prev.second) {
+                val busy = (cur.second - cur.first) - (prev.second - prev.first)
+                (100.0 * busy / (cur.second - prev.second)).toInt().coerceIn(0, 100)
+            } else -1
+            prev = cur
+        }
+    }
+    Column(Modifier.fillMaxWidth()) {
+        MonRow("RAM", ram, fg, fg2, accent)
+        if (swap >= 0) MonRow("Swap", swap, fg, fg2, accent)
+        MonRow("Storage", storage, fg, fg2, accent)
+        MonRow("CPU", cpu, fg, fg2, accent)
+    }
+}
+
+@Composable
+private fun MonRow(label: String, pct: Int, fg: Color, fg2: Color, accent: Color) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Txt(label, 10.5f, fg2, modifier = Modifier.width(52.dp))
+        Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(fg.copy(alpha = 0.12f))) {
+            if (pct >= 0) Box(Modifier.fillMaxWidth(pct / 100f).fillMaxHeight().background(if (pct >= 85) accent else fg))
+        }
+        Spacer(Modifier.width(8.dp))
+        Txt(if (pct < 0) "—" else "$pct%", 10.5f, fg, modifier = Modifier.width(34.dp), align = TextAlign.End)
+    }
+}
+
+private val QUOTE_LINES = MESSAGES + listOf(
+    "Discipline beats motivation.",
+    "You don't need more time, you need more focus.",
+    "Small progress is still progress.",
+    "Done today beats perfect tomorrow.",
+    "The hardest part is opening the book.",
+    "One page. Then another.",
+    "Future you is watching what you do now.",
+    "Rest is part of the work."
+)
+
+private val FACT_LINES = listOf(
+    "Handwritten notes beat typing for later recall.",
+    "Reviewing at 1 day, 3 days and 1 week beats cramming.",
+    "The Pomodoro timer is named after a kitchen timer.",
+    "Exercise raises BDNF, which helps the brain learn.",
+    "Caffeine takes about 20 minutes to reach the bloodstream.",
+    "Sleep is when the brain consolidates the day's learning.",
+    "Mixing subjects while studying can improve retention.",
+    "Writing a goal down makes you more likely to reach it.",
+    "A short nap restores alertness better than coffee.",
+    "Teaching a topic to someone exposes what you missed."
+)
+
+@Composable
+private fun QuotesContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
+    val pool = when (w.get("mode", "both")) {
+        "quotes" -> QUOTE_LINES.map { "Quote" to it }
+        "facts" -> FACT_LINES.map { "Fact" to it }
+        else -> QUOTE_LINES.map { "Quote" to it } + FACT_LINES.map { "Fact" to it }
+    }
+    var idx by remember(w.id, w.get("mode")) { mutableIntStateOf(Random.nextInt(pool.size)) }
+    val (kind, text) = pool[idx % pool.size]
+    Column(Modifier.fillMaxWidth().tap { idx = Random.nextInt(pool.size) }) {
+        Txt(kind.uppercase(), 9.5f, accent, FontWeight.Bold)
+        Spacer(Modifier.height(6.dp))
+        Txt(text, 14.5f, fg, FontWeight.Light, maxLines = 4)
+    }
+}
+
+internal val HOLIDAYS = listOf(
+    "New Year" to (1 to 1),
+    "Valentine's Day" to (2 to 14),
+    "Earth Day" to (4 to 22),
+    "Halloween" to (10 to 31),
+    "Christmas" to (12 to 25)
+)
+
+/** Next [n] holidays from [today] as (name, days left); dates already past roll to next year. */
+internal fun upcomingHolidays(today: LocalDate, n: Int): List<Pair<String, Int>> =
+    HOLIDAYS.map { (name, md) ->
+        var date = LocalDate.of(today.year, md.first, md.second)
+        if (date.isBefore(today)) date = date.plusYears(1)
+        name to ChronoUnit.DAYS.between(today, date).toInt()
+    }.sortedBy { it.second }.take(n)
+
+@Composable
+private fun EventsContent(fg: Color, fg2: Color, accent: Color) {
+    val today = rememberNow().toLocalDate()
+    val upcoming = remember(today) { upcomingHolidays(today, 3) }
+    Column(Modifier.fillMaxWidth()) {
+        upcoming.forEach { (name, days) ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Txt(name, 12.5f, fg)
+                Txt(
+                    when {
+                        days == 0 -> "today"
+                        days == 1 -> "tomorrow"
+                        else -> "in $days days"
+                    },
+                    11f, if (days <= 7) accent else fg2
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotosContent(fg: Color, fg2: Color) {
+    val ctx = LocalContext.current
+    val count = Wallpapers.savedCount(ctx)
+    var slot by remember { mutableIntStateOf(0) }
+    var bmp by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(slot, count) {
+        if (count > 0) {
+            bmp = withContext(Dispatchers.IO) { Wallpapers.photoBitmap(ctx, slot % count) }?.asImageBitmap()
+        }
+    }
+    LaunchedEffect(count) {
+        while (count > 0) {
+            delay(8_000)
+            slot = (slot + 1) % count
+        }
+    }
+    if (count == 0) {
+        Column(Modifier.fillMaxWidth()) {
+            Txt("No photos yet", 14f, fg)
+            Spacer(Modifier.height(4.dp))
+            Txt("Add photos in Style > Adjust wallpaper", 11f, fg2, maxLines = 2)
+        }
+    } else {
+        Box(
+            Modifier.fillMaxWidth().fillMaxHeight().clip(RoundedCornerShape(10.dp))
+                .tap { slot = (slot + 1) % count }
+        ) {
+            bmp?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        }
+    }
+}
+
 @Composable
 private fun NextContent(w: WidgetItem, fg: Color, fg2: Color) {
     Txt("Next", 11f, fg2)
@@ -788,8 +988,9 @@ private fun NextContent(w: WidgetItem, fg: Color, fg2: Color) {
 
 @Composable
 private fun CountdownContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
+    val today = rememberNow().toLocalDate()
     val d = runCatching { LocalDate.parse(w.get("date")) }.getOrNull()
-    val days = d?.let { ChronoUnit.DAYS.between(LocalDate.now(), it).toInt().coerceAtLeast(0) }
+    val days = d?.let { ChronoUnit.DAYS.between(today, it).toInt().coerceAtLeast(0) }
     Txt(w.get("title").ifBlank { "Exam" }, 13f, fg2)
     Spacer(Modifier.height(12.dp))
     if (days != null) {
@@ -938,6 +1139,7 @@ private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent
 @Composable
 fun GlyphMatrix(mode: String, color: Color, accent: Color, modifier: Modifier) {
     val now = rememberNow()
+    val is24 = DateFormat.is24HourFormat(LocalContext.current)
     var t by remember { mutableFloatStateOf(0f) }
     val motion = LocalMotionScale.current
     // ponytail: Time mode never reads t — skip the frame loop entirely
@@ -950,7 +1152,9 @@ fun GlyphMatrix(mode: String, color: Color, accent: Color, modifier: Modifier) {
             last = n
         }
     }
-    val lit = remember(mode, now.hour, now.minute) { if (mode == "Time") timeCells(now.hour, now.minute) else emptySet() }
+    val lit = remember(mode, now.hour, now.minute, is24) {
+        if (mode == "Time") timeCells(if (is24) now.hour else ((now.hour + 11) % 12) + 1, now.minute) else emptySet()
+    }
     Canvas(modifier) {
         val n = 25
         val cell = size.width / n

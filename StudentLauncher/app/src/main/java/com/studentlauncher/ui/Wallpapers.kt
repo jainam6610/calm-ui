@@ -75,6 +75,13 @@ object Wallpapers {
     fun savedCount(ctx: Context): Int =
         (MAX_SHUFFLE downTo 1).firstOrNull { photoFile(ctx, it - 1).exists() } ?: 0
 
+    /** Decoded photo for widget drawing, sampled ~4x down to keep memory small. */
+    fun photoBitmap(ctx: Context, slot: Int): Bitmap? = runCatching {
+        val f = photoFile(ctx, slot)
+        if (!f.exists()) null
+        else BitmapFactory.decodeFile(f.path, BitmapFactory.Options().apply { inSampleSize = 4 })
+    }.getOrNull()
+
     /** Copies the picked image (downscaled) into app storage so it survives permission loss. */
     fun savePhoto(ctx: Context, uri: Uri, slot: Int = 0): Boolean = runCatching {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -157,10 +164,13 @@ object Wallpapers {
         return blurTo(src, sw, 2, 2)
     }
 
-    /** Frosted copy that glass surfaces sample. */
-    fun blur(src: Bitmap): Bitmap = blurTo(src, 72, 3, 3)
+    /**
+     * Frosted copy that glass surfaces sample, kept at blur resolution (72px wide) instead of
+     * upscaled back to screen size — saves a full-size bitmap; GlassEnv scales its sample coords.
+     */
+    fun blur(src: Bitmap): Bitmap = blurTo(src, 72, 3, 3, upscale = false)
 
-    private fun blurTo(src: Bitmap, sw: Int, r: Int, passes: Int): Bitmap {
+    private fun blurTo(src: Bitmap, sw: Int, r: Int, passes: Int, upscale: Boolean = true): Bitmap {
         var b = src
         while (b.width / 2 >= sw) b = Bitmap.createScaledBitmap(b, b.width / 2, b.height / 2, true)
         val sh = max(1, (src.height * sw / src.width.toFloat()).toInt())
@@ -169,6 +179,7 @@ object Wallpapers {
         small.getPixels(px, 0, sw, 0, 0, sw, sh)
         repeat(passes) { boxBlur(px, sw, sh, r) }
         small.setPixels(px, 0, sw, 0, 0, sw, sh)
+        if (!upscale) return small
         return Bitmap.createScaledBitmap(small, src.width, src.height, true).copy(Bitmap.Config.ARGB_8888, true)
     }
 

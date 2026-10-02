@@ -38,7 +38,11 @@ import kotlin.math.roundToInt
 
 /** The blurred wallpaper every glass surface samples, plus the theme flag. */
 @Stable
-class GlassEnv(val blurred: ImageBitmap?, val dark: Boolean) {
+class GlassEnv(val blurred: ImageBitmap?, val dark: Boolean, screenW: Int = 0) {
+    /** Blurred-bitmap px per screen px; the frosted copy lives at ~72/1080, full-res gives 1. */
+    val scale: Float =
+        if (blurred != null && screenW > 0) blurred.width.toFloat() / screenW else 1f
+
     val shader: Shader? = blurred?.let {
         BitmapShader(it.asAndroidBitmap(), android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
     }
@@ -52,6 +56,7 @@ uniform float2 size;
 uniform float2 origin;
 uniform float radius;
 uniform float refr;
+uniform float ss;
 
 half4 main(float2 coord) {
     float2 p = coord - size * 0.5;
@@ -60,8 +65,8 @@ half4 main(float2 coord) {
     float depth = clamp(-d / (radius * 1.1 + 1.0), 0.0, 1.0);
     float bend = pow(1.0 - depth, 2.4) * refr;
     float2 dir = p / (length(p) + 0.001);
-    float2 uv = coord + origin - dir * bend * radius * 0.85;
-    float ca = bend * 3.0;
+    float2 uv = (coord + origin - dir * bend * radius * 0.85) * ss;
+    float ca = bend * 3.0 * ss;
     float r = image.eval(uv + dir * ca).r;
     float g = image.eval(uv).g;
     float b = image.eval(uv - dir * ca).b;
@@ -81,13 +86,14 @@ private val sharedGlassShader: Any? by lazy {
 }
 
 @RequiresApi(33)
-private fun DrawScope.refract(shaderAny: Any, bitmapShader: Shader, origin: Offset, r: Float) {
+private fun DrawScope.refract(shaderAny: Any, bitmapShader: Shader, origin: Offset, r: Float, ss: Float) {
     val s = shaderAny as RuntimeShader
     s.setInputShader("image", bitmapShader)
     s.setFloatUniform("size", size.width, size.height)
     s.setFloatUniform("origin", origin.x, origin.y)
     s.setFloatUniform("radius", r)
     s.setFloatUniform("refr", 0.9f)
+    s.setFloatUniform("ss", ss)
     drawRect(ShaderBrush(s))
 }
 
@@ -116,13 +122,13 @@ fun Modifier.glass(radius: Dp = 26.dp): Modifier = composed {
             if (bmp != null && w > 0f && h > 0f) {
                 val bs = env.shader
                 if (Build.VERSION.SDK_INT >= 33 && agsl != null && bs != null) {
-                    refract(agsl, bs, origin, r)
+                    refract(agsl, bs, origin, r, env.scale)
                 } else {
-                    val sw = w.roundToInt().coerceAtMost(bmp.width)
-                    val sh = h.roundToInt().coerceAtMost(bmp.height)
-                    val sx = origin.x.roundToInt().coerceIn(0, max(0, bmp.width - sw))
-                    val sy = origin.y.roundToInt().coerceIn(0, max(0, bmp.height - sh))
-                    drawImage(bmp, srcOffset = IntOffset(sx, sy), srcSize = IntSize(sw, sh), dstSize = IntSize(sw, sh))
+                    val sw = (w * env.scale).roundToInt().coerceAtMost(bmp.width)
+                    val sh = (h * env.scale).roundToInt().coerceAtMost(bmp.height)
+                    val sx = (origin.x * env.scale).roundToInt().coerceIn(0, max(0, bmp.width - sw))
+                    val sy = (origin.y * env.scale).roundToInt().coerceIn(0, max(0, bmp.height - sh))
+                    drawImage(bmp, srcOffset = IntOffset(sx, sy), srcSize = IntSize(sw, sh), dstSize = IntSize(w.roundToInt(), h.roundToInt()))
                 }
             }
             drawRect(Color.White.copy(alpha = if (dark) 0.06f else 0.26f))

@@ -330,9 +330,11 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
 
         SettingSection("Advanced", "${(vm.motionIntensity * 100).toInt()}% motion") {
             Txt("Font", 12f, c.fg2)
-            Segmented(listOf("system" to "System", "serif" to "Serif", "mono" to "Mono"), vm.uiFont, vm::applyUiFont)
+            Segmented(listOf("system" to "System", "serif" to "Serif", "mono" to "Mono", "poppins" to "Poppins"), vm.uiFont, vm::applyUiFont)
             Spacer(Modifier.height(10.dp))
             SwitchSetting("Compact density", "Fit more without changing text size", vm.compactDensity, vm::applyCompactDensity)
+            Spacer(Modifier.height(8.dp))
+            SwitchSetting("Normal scroll", "Continuous A-Z list like a phone. Off = Niagara letter pages", vm.normalScroll, vm::applyNormalScroll)
             Spacer(Modifier.height(8.dp))
             Txt("Alphabet scrubber", 12f, c.fg2)
             Segmented(listOf(AlphaSide.Right to "Right", AlphaSide.Left to "Left", AlphaSide.Off to "Off"), vm.alphaSide, vm::applyAlphaSide)

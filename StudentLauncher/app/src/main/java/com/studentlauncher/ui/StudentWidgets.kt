@@ -161,7 +161,7 @@ private fun monthLabel(): String = LocalDate.now().month.getDisplayName(JTextSty
 
 @Composable
 fun PlannerContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, accent: Color) {
-    val today = LocalDate.now()
+    val today = rememberNow().toLocalDate()
     val lines = w.get("lines").split("\u0001").let { if (it.size == 7) it else List(7) { "" } }
     var editing by remember(w.id) { mutableStateOf(-1) }
     var draft by remember(w.id) { mutableStateOf("") }
@@ -356,7 +356,7 @@ fun FlashcardsContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Colo
 @Composable
 fun HabitsContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, accent: Color) {
     val names = w.get("names", "").split("|").filter { it.isNotBlank() }
-    val today = LocalDate.now()
+    val today = rememberNow().toLocalDate()
     Txt("Habits", 11f, fg2)
     Spacer(Modifier.height(8.dp))
     if (names.isEmpty()) {
@@ -445,7 +445,7 @@ fun GpaContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, acce
 
 @Composable
 fun WaterContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, accent: Color) {
-    val today = remember { LocalDate.now().toString() }
+    val today = rememberNow().toLocalDate().toString()
     LaunchedEffect(today, w.id) {
         if (w.get("date") != today) vm.updateWidget(w.id) { it.put("date", today).put("count", "0") }
     }

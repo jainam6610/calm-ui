@@ -37,12 +37,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -396,30 +398,34 @@ fun AllAppsPanel(
         Spacer(Modifier.height(10.dp))
         Segmented(listOf(Chip.All to "All", Chip.Study to "Study"), vm.chip, { vm.chip = it }, Modifier.width(170.dp))
         Spacer(Modifier.height(12.dp))
-        AnimatedContent(
-            targetState = key,
-            transitionSpec = {
-                val d = vm.letterDir
-                (slideInVertically(Motion.Offset) { it * d / 4 } + fadeIn(Motion.Macro)) togetherWith
-                    (slideOutVertically(Motion.Offset) { -it * d / 4 } + fadeOut(Motion.Macro))
-            },
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            label = "panel"
-        ) { k ->
-            val results = vm.appsForKey(k)
-            Row(Modifier.fillMaxSize()) {
-                Box(Modifier.width(64.dp)) {
-                    if (k != "q") Txt(k, 56f, c.fg, FontWeight.Light)
-                }
-                if (results.isEmpty()) {
-                    Txt(
-                        if (k == "q") "No matches" else "No apps under $k",
-                        14f, c.fg2, modifier = Modifier.padding(top = 18.dp)
-                    )
-                } else {
-                    LazyColumn(Modifier.weight(1f)) {
-                        items(results, key = { it.pkg }) { a ->
-                            AppEntry(a, vm, EntryMode.Panel, onLaunch, onMenu)
+        if (vm.normalScroll && key != "q") {
+            NormalList(vm, Modifier.weight(1f).fillMaxWidth(), onLaunch, onMenu)
+        } else {
+            AnimatedContent(
+                targetState = key,
+                transitionSpec = {
+                    val d = vm.letterDir
+                    (slideInVertically(Motion.Offset) { it * d / 4 } + fadeIn(Motion.Macro)) togetherWith
+                        (slideOutVertically(Motion.Offset) { -it * d / 4 } + fadeOut(Motion.Macro))
+                },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                label = "panel"
+            ) { k ->
+                val results = vm.appsForKey(k)
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.width(64.dp)) {
+                        if (k != "q") Txt(k, 56f, c.fg, FontWeight.Light)
+                    }
+                    if (results.isEmpty()) {
+                        Txt(
+                            if (k == "q") "No matches" else "No apps under $k",
+                            14f, c.fg2, modifier = Modifier.padding(top = 18.dp)
+                        )
+                    } else {
+                        LazyColumn(Modifier.weight(1f)) {
+                            items(results, key = { it.pkg }) { a ->
+                                AppEntry(a, vm, EntryMode.Panel, onLaunch, onMenu)
+                            }
                         }
                     }
                 }
@@ -428,6 +434,55 @@ fun AllAppsPanel(
         Spacer(Modifier.height(8.dp))
         SearchField(vm) {
             vm.appsForKey("q").firstOrNull()?.let { onLaunch(it, Rect(Offset.Zero, Offset.Zero)) }
+        }
+    }
+}
+
+/** Flattened LazyColumn index of group [groupIdx]'s sticky header (each group = 1 header + N items), else -1. */
+internal fun groupScrollIndex(groupSizes: List<Int>, groupIdx: Int): Int =
+    if (groupIdx in groupSizes.indices) groupSizes.take(groupIdx).sumOf { it + 1 } else -1
+
+/** Group for a scrubbed letter: exact match, else nearest above, else nearest below; -1 when the list is empty. */
+internal fun targetGroupIndex(letters: List<Char>, scrub: Char): Int =
+    letters.indexOf(scrub).takeIf { it >= 0 }
+        ?: letters.indexOfFirst { it > scrub }.takeIf { it >= 0 }
+        ?: letters.indexOfLast { it < scrub }.takeIf { it >= 0 }
+        ?: -1
+
+/** Normal phone-style A-Z list with sticky letter headers (Settings > Advanced > Normal scroll). */
+@Composable
+private fun NormalList(
+    vm: LauncherViewModel,
+    modifier: Modifier,
+    onLaunch: (AppInfo, Rect) -> Unit,
+    onMenu: (AppInfo, Rect) -> Unit
+) {
+    val c = LocalColors.current
+    val groups = vm.groupedApps()
+    val state = rememberLazyListState()
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(vm.scrubTick) {
+        if (first) first = false
+        else {
+            val gi = targetGroupIndex(groups.map { it.first }, vm.letter)
+            val li = groupScrollIndex(groups.map { it.second.size }, gi)
+            if (li >= 0) state.animateScrollToItem(li)
+        }
+    }
+    if (groups.isEmpty()) {
+        Txt("No apps", 14f, c.fg2, modifier = modifier.padding(top = 18.dp))
+        return
+    }
+    LazyColumn(state = state, modifier = modifier) {
+        groups.forEach { (letter, apps) ->
+            stickyHeader(key = "hdr_$letter") {
+                Box(Modifier.fillMaxWidth().background(c.tile).padding(vertical = 5.dp)) {
+                    Txt(letter.toString(), 22f, c.fg, FontWeight.Light)
+                }
+            }
+            items(apps, key = { it.pkg }) { a ->
+                AppEntry(a, vm, EntryMode.Panel, onLaunch, onMenu)
+            }
         }
     }
 }

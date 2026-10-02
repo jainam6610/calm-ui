@@ -33,6 +33,10 @@ object WT {
     const val WATER = "water"
     const val FORMULAS = "formulas"
     const val ASSIGNMENTS = "assignments"
+    const val MONITOR = "monitor"
+    const val QUOTES = "quotes"
+    const val EVENTS = "events"
+    const val PHOTOS = "photos"
 
     val catalog: List<Triple<String, String, String>> = listOf(
         Triple(CLOCK, "Clock", "Dot, digital, words or analog"),
@@ -58,7 +62,11 @@ object WT {
         Triple(GPA, "GPA", "Track your GPA by course"),
         Triple(WATER, "Water", "Log glasses of water"),
         Triple(FORMULAS, "Formulas", "Pin a formula for quick reference"),
-        Triple(ASSIGNMENTS, "Assignments", "Track assignment due dates")
+        Triple(ASSIGNMENTS, "Assignments", "Track assignment due dates"),
+        Triple(MONITOR, "Monitor", "RAM, storage, swap and CPU"),
+        Triple(QUOTES, "Quotes & facts", "A random line, tap for another"),
+        Triple(EVENTS, "Events", "Upcoming holidays with days left"),
+        Triple(PHOTOS, "Photos", "Rotates through your wallpaper photos")
     )
 
     fun title(type: String): String =
@@ -83,7 +91,7 @@ data class WidgetItem(
 
 fun newWidget(type: String): WidgetItem {
     val h = when (type) {
-        WT.DATE, WT.BATTERY, WT.NEXT, WT.COUNTDOWN, WT.TIMER, WT.WATER, WT.POMODORO -> 1
+        WT.DATE, WT.BATTERY, WT.NEXT, WT.COUNTDOWN, WT.TIMER, WT.WATER, WT.POMODORO, WT.EVENTS -> 1
         WT.TASKS, WT.QUICK, WT.SPHERE, WT.GLYPH, WT.TODAY, WT.PLANNER, WT.FLASHCARDS, WT.FORMULAS, WT.ASSIGNMENTS, WT.REMINDERS -> 2
         else -> 2
     }
@@ -107,6 +115,7 @@ fun newWidget(type: String): WidgetItem {
             WT.GPA -> mapOf("rows" to "")
             WT.WATER -> mapOf("goal" to "8", "date" to "", "count" to "0")
             WT.FORMULAS -> mapOf("title" to "Formula", "body" to "")
+            WT.QUOTES -> mapOf("mode" to "both")
             else -> emptyMap()
         }
     )

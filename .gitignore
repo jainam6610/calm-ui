@@ -2,7 +2,6 @@
 /hive/
 /roster-backups/
 /roster.json
-/StudentLauncher-v4/
 
 # Build / IDE / signing - mirrors StudentLauncher/.gitignore for future top-level modules
 .kotlin/

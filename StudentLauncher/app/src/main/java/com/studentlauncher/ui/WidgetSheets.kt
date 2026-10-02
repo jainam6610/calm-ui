@@ -271,6 +271,13 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                     w.get("mode", "Pulse"), { vm.setCfg(id, "mode", it) }
                 )
             }
+            WT.QUOTES -> {
+                SLabel("Show")
+                Segmented(
+                    listOf("both" to "Both", "quotes" to "Quotes", "facts" to "Facts"),
+                    w.get("mode", "both"), { vm.setCfg(id, "mode", it) }
+                )
+            }
         }
 
         Spacer(Modifier.height(18.dp))
