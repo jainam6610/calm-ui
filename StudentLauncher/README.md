@@ -1,4 +1,4 @@
-# Student Launcher 2.0
+# Student Launcher 3.0
 
 A calm, distraction-free Android launcher for students. Kotlin + Jetpack Compose, no third-party libraries.
 Developed by thats.jainam.
@@ -9,7 +9,7 @@ Developed by thats.jainam.
 2. Run on a device or emulator, press Home and choose Student Launcher as the default home app.
 3. Play Store: see docs/PLAY_STORE.md (signing, AAB, listing text, data safety, privacy policy, store graphics in store/).
 
-This code was written without a compiler, so expect a few small compile errors on first sync.
+Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebug` (0 lint errors).
 
 ## Quiet Motion redesign
 - First-run onboarding is a three-step, skippable flow. It only requests notification permission when the student explicitly chooses focus reminders; the flow can be restarted in Settings.

@@ -32,45 +32,76 @@
         a { color: #2563eb; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #888; }
+        @media (max-width: 520px) { .container { padding: 1.4rem; border-radius: 0; box-shadow: none; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Privacy Policy</h1>
-        <p class="date">Effective date: September 20, 2026</p>
+        <h1>Privacy Policy — Student Launcher</h1>
+        <p class="date">App: <strong>Student Launcher</strong> (package <code>com.studentlauncher</code>) · Developer: <strong>thats.jainam</strong> (individual developer) · Effective date: <strong>October 8, 2026</strong></p>
 
-        <p>Student Launcher is developed by <a href="https://github.com/thats.jainam" target="_blank">thats.jainam</a>.</p>
+        <p><strong>Short version: no data leaves your device.</strong> Student Launcher has no accounts, no advertising, no analytics and no third-party SDKs. The app is not given internet access (it has no <code>INTERNET</code> permission), so it cannot send anything to us or to anyone else. We do not collect, transmit, sell or share personal data.</p>
 
-        <p><strong>No data leaves your device.</strong> Student Launcher has no accounts, no ads, no analytics and no network access. We do not collect, transmit or share personal data with us or anyone else.</p>
+        <p>If you tap a link inside the app (for example this policy), that link opens in <strong>your browser</strong>, which then loads the page. The app itself still sends nothing.</p>
 
-        <h2>What stays on your device</h2>
+        <h2>What the app stores on your device</h2>
+        <p>Everything below is written to the app's private storage on your phone only:</p>
         <ul>
-            <li>Your settings, widget layout, tasks, pinned apps and marked apps (stored locally in the app's private storage).</li>
-            <li>Your chosen wallpaper photo(s), copied into the app's private storage when you pick them with the system photo picker.</li>
+            <li><strong>Settings and layout</strong> — theme, accent, motion, wallpaper choice and edit values, pinned apps, home order, widget placement.</li>
+            <li><strong>Plan (tasks and events)</strong> — task title, course, due date, priority and completion state; your event list.</li>
+            <li><strong>Widget content you type</strong> — this can include personal things such as <strong>expense entries and budget</strong>, <strong>grades / GPA rows</strong>, <strong>habits</strong>, <strong>water logs</strong>, <strong>flashcards</strong>, assignments, class schedule, formulas and reminders.</li>
+            <li><strong>Focus / mindful numbers</strong> — daily budgets, per-app limits, pause counts and the minutes shown in the Today and Mindful widgets.</li>
+            <li><strong>Your PIN (if you set one)</strong> — only a <strong>salted hash</strong> (PBKDF2-HMAC-SHA256) is stored. The PIN itself is never written down anywhere, and it is never sent anywhere.</li>
+            <li><strong>Wallpaper photos you pick</strong> — a copy is placed in the app's private storage when you choose it. Original photos are not kept and their locations are not remembered.</li>
+            <li><strong>The list of apps installed on your phone</strong> — used only to draw your home screen and app list.</li>
         </ul>
-        <p>This data is stored only in the app's private storage on your phone. Device backup for the app is disabled (<code>allowBackup</code> is off), so nothing is copied to cloud backup.</p>
+        <p>None of this is transmitted off the device. None of it is shared with third parties, because the app has no third-party code in it.</p>
 
-        <h2>Retention and deletion</h2>
-        <p>The data above stays on your device only as long as you keep the app. To delete it, clear the app's storage in system settings (Settings → Apps → Student Launcher → Storage → Clear storage) or uninstall the app. Clearing storage or uninstalling removes all settings, tasks, layouts and wallpaper copies. We never receive deletion requests because we never receive your data.</p>
+        <h2>How the usage numbers are produced</h2>
+        <p>The minutes shown for "distracting" apps are <strong>counted by this launcher itself</strong>: it starts a timer when <em>you</em> open an app from the launcher's home screen and stops it when you come back. The app does <strong>not</strong> use Android's usage-access (<code>PACKAGE_USAGE_STATS</code>), no accessibility service and no overlay — none of those permissions are requested. The result is stored only in the app's private storage and is never uploaded.</p>
 
-        <h2>Permissions</h2>
+        <h2>Permissions we request</h2>
         <ul>
-            <li><strong>Notifications (optional):</strong> used only to show focus reminders while you are in an app you marked as distracting. You can turn this off at any time in the app or in system settings.</li>
+            <li><strong>Notifications (optional, <code>POST_NOTIFICATIONS</code>):</strong> used only to show the focus reminder ("10 min on …") while you are in an app you marked as distracting. It is requested only when you turn reminders on, and you can withdraw it at any time in system settings. If you deny it, everything else in the app still works; only the reminder is missing.</li>
         </ul>
+        <p>That is the only permission the app requests. There is no location, contacts, calendar, SMS, microphone, camera, storage, phone or usage-access permission.</p>
 
         <h2>Installed apps</h2>
-        <p>The app reads the list of installed apps on your device only to show your home screen and app list. This list stays on your device and is never sent anywhere.</p>
+        <p>The app reads the list of installed apps only to show your home screen and app list. This list stays on your device and is never sent anywhere. The app does not use <code>QUERY_ALL_PACKAGES</code>.</p>
 
         <h2>Photos</h2>
-        <p>Wallpaper photos are chosen with Android's system photo picker. The app does not read your full gallery; it only receives the photos you select, and only stores a copy in its private storage for the wallpaper.</p>
+        <p>Wallpaper photos are chosen with Android's system photo picker. The app never reads your whole gallery — it only receives the photos you select, and keeps a copy of each in its own private storage for the wallpaper.</p>
 
         <h2>Third-party widgets</h2>
-        <p>Android widgets you add are provided by their own apps and follow their own privacy policies.</p>
+        <p>Android widgets you add are provided by their own apps and follow their own privacy policies. This app does not see or forward their content.</p>
+
+        <h2>Children and young users</h2>
+        <p>Student Launcher does not ask for or collect personal information from anyone, including children: no name, no age, no email address, no contacts and no location. It contains no advertising, no in-app purchases, no user-generated content sharing and no third-party analytics. Younger users should ask a parent or guardian before installing any app.</p>
+
+        <h2>Security</h2>
+        <p>All data sits in the app's private storage, which other apps on the device cannot read. If you set a PIN, only its salted hash is kept, and repeated wrong tries lock the keypad for a growing cool-down. Cloud backup and device-to-device transfer for this app are disabled (<code>allowBackup</code> is off and backup/transfer rules exclude all app data), so nothing is copied to Google Drive or a new phone.</p>
+
+        <h2>Retention and deletion</h2>
+        <p>Your data stays on the device only for as long as the app is installed. You delete it yourself, at any time, in either of these ways:</p>
+        <ul>
+            <li>Settings → Apps → Student Launcher → Storage → <strong>Clear storage</strong> (removes every setting, task, widget entry, log and wallpaper copy), or</li>
+            <li><strong>Uninstall</strong> the app (app-private storage is removed with it).</li>
+        </ul>
+        <p>There is currently no separate "delete my data" button inside the app — clearing storage or uninstalling is the complete deletion path. Because we never receive your data, we have no copy to delete and cannot receive deletion requests; if that ever changes, this policy will say so before it happens.</p>
+
+        <h2>Wellbeing features</h2>
+        <p>Mindful Mode, the breathe step, brain tasks, focus timers and usage budgets are <strong>self-help and productivity tools only</strong>. They are not medical, diagnostic, therapeutic or mental-health treatment, and nothing in the app is medical advice. Talk to a qualified professional about health concerns.</p>
+
+        <h2>Changes to this policy</h2>
+        <p>The effective date at the top of this page is updated whenever this policy changes. Material changes are announced in the app's Google Play listing release notes and in the app itself. The current version always lives at this same address.</p>
+
+        <h2>Bugs and suggestions</h2>
+        <p>Find a bug or have a suggestion? Tag us and we will fix or add it within 30 days — email <a href="mailto:ruplaikarnawat01@gmail.com">ruplaikarnawat01@gmail.com</a> or message <strong>@thats.jainam.dev</strong> on Instagram.</p>
 
         <h2>Contact</h2>
-        <p>For questions about this privacy policy or your data, contact <a href="https://github.com/thats.jainam" target="_blank">thats.jainam</a> on GitHub.</p>
+        <p>Privacy questions: <a href="mailto:ruplaikarnawat01@gmail.com">ruplaikarnawat01@gmail.com</a> · Instagram: <strong>@thats.jainam.dev</strong> · GitHub: <a href="https://github.com/thats.jainam" target="_blank" rel="noopener">github.com/thats.jainam</a></p>
 
-        <div class="footer">Student Launcher &mdash; Private by design.</div>
+        <div class="footer">Student Launcher — private by design. Last updated: October 8, 2026.</div>
     </div>
 </body>
 </html>
