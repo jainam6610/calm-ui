@@ -38,7 +38,7 @@ Severity: **BLOCKER** = rejection/suspension risk · **HIGH** = likely review fr
 | Effective date bumped + how changes are announced | ✅ (⚠️ before fix) | old: "September 20, 2026"; now **October 8, 2026** + a "Changes to this policy" section (release notes in the Play listing + in app) | User Data: keep policy & Data safety up to date | — |
 | Same URL in Play Console **and** inside the app | ✅ in-app / ❓ Console | in-app: `ui/FirstRun.kt:354-355` (Settings → Privacy & About → Privacy Policy) and `ui/WidgetSheets.kt:317-318` (About → Privacy Policy), both opening exactly `https://jainam662010-boop.github.io/StudentLauncher/privacy.html` | App content: "You must link to a privacy policy on your app's store listing page and within your app" | Console part: MEDIUM |
 | Only one copy of the policy in the repo | ✅ (⚠️ before fix) | was ⚠️: three copies (root `privacy.html`, `StudentLauncher/docs/privacy.html` identical, `StudentLauncher/docs/PRIVACY_POLICY.md` markdown). Fixed: both `docs/` copies deleted (`git rm`), `PLAY_STORE.md` reference corrected to the repo root file | User Data: single authoritative policy | — |
-| GitHub Pages serves the intended branch/folder and latest commit | ⚠️ | Pages config verified: `gh api repos/jainam662010-boop/StudentLauncher/pages` → `{"status":"built","build_type":"legacy","source":{"branch":"master","path":"/"},"https_enforced":true}` — correct. **But** local `master` is **9 commits ahead of `origin/master`**, and the live page still serves the old text (`Content-Length: 4027` = old file; `Last-Modified: Fri, 25 Sep 2026`). New text goes live only after push (§4) | User Data: policy must be available | MEDIUM (resolved by push) |
+| GitHub Pages serves the intended branch/folder and latest commit | ✅ | Pages config verified: `gh api repos/jainam662010-boop/StudentLauncher/pages` → `{"status":"built","build_type":"legacy","source":{"branch":"master","path":"/"},"https_enforced":true}` — correct. `master` pushed at `f32d92e`; live page re-checked after the push: `HTTP/1.1 200 OK`, `Content-Length: 8941`, `Last-Modified: Thu, 08 Oct 2026 16:24:43 GMT`, body contains "October 8, 2026" and the contact email | User Data: policy must be available | — |
 | Mobile-readable, `<title>` names the app, plain language | ✅ | `privacy.html` has `<meta name="viewport">`, `<title>Privacy Policy – Student Launcher</title>`, a small-screen media query, short plain sentences, no external font/script/tracker | User Data: readable, app-specific | — |
 
 ## 2.2 Data safety form (Console) — drafted in `DATA_SAFETY_ANSWERS.md`
@@ -146,7 +146,7 @@ Severity: **BLOCKER** = rejection/suspension risk · **HIGH** = likely review fr
 
 1. **⚠️ HIGH — `res/raw/onboarding_ad.mp4`**: AI-generated promo with Google/YouTube logos, an AI watermark and fake UI text. Replace with a real screen recording or delete the video onboarding step (`ui/Onboarding.kt:134-155`). *Impersonation / Metadata accuracy.*
 2. **⚠️ HIGH (Console) — Health apps declaration**: fetched policy says all developers with health-related features must complete it; complete it with the honest answers below. *Health apps policy.*
-3. **⚠️ MEDIUM — live privacy policy is still the old text** until `master` is pushed (local is 9 commits ahead; live `Content-Length: 4027`, `Last-Modified: 25 Sep 2026`). Push steps in §4.
+3. ~~⚠️ MEDIUM — live privacy policy is still the old text~~ — **resolved**: pushed and live-verified (`HTTP 200`, `Last-Modified: Thu, 08 Oct 2026 16:24:43 GMT`, new date + contact email present). Re-check any time with the §4 commands.
 4. **❓ MEDIUM — Play Console state** not verifiable from the repo: privacy-URL field, Data safety form, target-audience selection, content rating, Ads declaration, App access, Play App Signing, live `versionCode` vs 7, developer-contact email matching `ruplaikarnawat01@gmail.com`.
 5. **❓ MEDIUM — store graphics** (`store/icon-512.png`, `store/feature-graphic-1024x500.png`) provenance unknown; confirm self-made or replace. **Screenshots** must still be captured from the shipped UI.
 6. **⚠️ LOW — Poppins OFL** not credited in-app / not shipped with the font files.
@@ -175,13 +175,8 @@ Severity: **BLOCKER** = rejection/suspension risk · **HIGH** = likely review fr
 
 ## §4 — Verifying the live policy page
 
-- The live URL currently serves the **old** policy (`Last-Modified: Fri, 25 Sep 2026`, `Content-Length: 4027`). It will **not** show the new text until you push (this pass did not push).
-- Push + refresh:
-  ```
-  git push origin master
-  ```
-  (GitHub Pages is `legacy`, source `master` / `/`, status `built` → Pages rebuilds automatically within ~1 min; re-run a build from the repo's Actions/Pages tab if it doesn't.)
-- Post-push checks (run on your machine):
+- **Done:** `git push origin master` was run on 2026-10-08 (`5fa5120..f32d92e`) and the live page was verified immediately after — `HTTP/1.1 200 OK`, `Content-Length: 8941`, `Last-Modified: Thu, 08 Oct 2026 16:24:43 GMT`, body matches the new `privacy.html`.
+- If you edit the policy again later: push, wait ~1 min for the Pages rebuild (Pages is `legacy`, source `master` / `/`, status `built`), then re-run the checks below:
   ```
   curl.exe -sIL https://jainam662010-boop.github.io/StudentLauncher/privacy.html     # expect: HTTP/1.1 200 OK
   curl.exe -s https://jainam662010-boop.github.io/StudentLauncher/privacy.html | Select-String "October 8, 2026"   # expect: the match
@@ -193,11 +188,9 @@ Severity: **BLOCKER** = rejection/suspension risk · **HIGH** = likely review fr
 
 - Commit 1: `docs: play compliance fact sheet and report` (docs/play-compliance only)
 - Commit 2: `fix: privacy policy and play-policy findings` (privacy.html, manifest + backup rules, docs deletions, store copy, README)
-- Nothing tagged, **nothing pushed**. Push with:
-  ```
-  git push origin master
-  ```
+- Commit 3: `docs: mark live policy page verified after push` (this file)
+- Pushed: `git push origin master` → `5fa5120..f32d92e` (2026-10-08), live page verified after the push; no tag created.
 
 ## Readiness statement
 
-Verified from source and build outputs: the app declares exactly one user-facing permission, has no network stack at all (so the "no data leaves the device" claim in both the policy and the Data safety form is provable), stores everything in app-private preferences with a salted PBKDF2 PIN hash, backs nothing up to the cloud (now also explicitly excluded by `dataExtractionRules`), targets the required API 36, ships a 64-bit, 16 KB-aligned artifact, logs nothing, contains no ad/analytics SDK, and its store copy now describes only features that exist; the privacy policy was rewritten so that every sentence about data is backed by a `file:line` citation, dated October 8, 2026, and is reachable at the same single URL that the app itself links to. What remains is **not** verifiable from a repository: the Play Console declarations (privacy-URL field, Data safety, target audience, content rating, Health-apps declaration, Ads, App access, Play App Signing, live versionCode, developer-contact email), the replacement of the onboarding video, capture of real screenshots, confirmation of the store graphics' provenance, and the push that makes the new policy live — each is listed above with exact wording or steps. Whether the app is ultimately approved is Google's decision, and Google's own guidance states that Google Play reviews apps across all policy requirements while the developer alone is responsible for the accuracy of the declarations; this report can show the repo is consistent and evidence-backed, not guarantee an outcome.
+Verified from source and build outputs: the app declares exactly one user-facing permission, has no network stack at all (so the "no data leaves the device" claim in both the policy and the Data safety form is provable), stores everything in app-private preferences with a salted PBKDF2 PIN hash, backs nothing up to the cloud (now also explicitly excluded by `dataExtractionRules`), targets the required API 36, ships a 64-bit, 16 KB-aligned artifact, logs nothing, contains no ad/analytics SDK, and its store copy now describes only features that exist; the privacy policy was rewritten so that every sentence about data is backed by a `file:line` citation, dated October 8, 2026, and is reachable at the same single URL that the app itself links to. What remains is **not** verifiable from a repository: the Play Console declarations (privacy-URL field, Data safety, target audience, content rating, Health-apps declaration, Ads, App access, Play App Signing, live versionCode, developer-contact email), the replacement of the onboarding video, capture of real screenshots, confirmation of the store graphics' provenance, and any future policy edit's push — each is listed above with exact wording or steps. Whether the app is ultimately approved is Google's decision, and Google's own guidance states that Google Play reviews apps across all policy requirements while the developer alone is responsible for the accuracy of the declarations; this report can show the repo is consistent and evidence-backed, not guarantee an outcome.
