@@ -500,7 +500,7 @@ fun ArrangeBar(vm: LauncherViewModel, onPage: Boolean, modifier: Modifier = Modi
     LaunchedEffect(onPage) {
         if (onPage) {
             shown = false
-            delay(130) // let mode borders land first (Niagara-style reveal)
+            delay(130) // let mode borders land first (staggered reveal)
             shown = true
         } else shown = false
     }
