@@ -322,11 +322,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 icons.keys.filter { it !in installed }.forEach { icons.remove(it) }
             }
             val px = (ctx.resources.displayMetrics.density * 56f).toInt().coerceAtLeast(96)
-            list.forEach { a ->
-                if (icons[a.pkg] == null) repo.loadIcon(a, px)?.let { ic ->
-                    withContext(Dispatchers.Main) { icons[a.pkg] = ic }
-                }
+            // Insert icons in batches: one state write per icon would trigger a recomposition
+            // storm while the app list is still being populated on the main thread.
+            val pending = ArrayList<Pair<String, AppIcons>>(16)
+            suspend fun flush() {
+                if (pending.isEmpty()) return
+                val batch = pending.toList()
+                pending.clear()
+                withContext(Dispatchers.Main) { batch.forEach { (k, v) -> icons[k] = v } }
             }
+            list.forEach { a ->
+                if (icons[a.pkg] == null) repo.loadIcon(a, px)?.let { pending.add(a.pkg to it) }
+                if (pending.size >= 8) flush()
+            }
+            flush()
         }
     }
 

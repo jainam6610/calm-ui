@@ -23,8 +23,20 @@ Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebu
   Clock (dot, digital, words, analog), date, week, battery, next up, exam countdown, study timer,
   tasks, quick settings, 3D sphere, glyph matrix, plus regular Android widgets.
   Each widget can use a Glass, Solid or None (no translucent cover) background, full or half width, and its own text colour.
-- Glyph matrix: on-screen 25 x 25 dot display (Pulse, Spiral, Wave, Time). It does not drive the physical
-  Glyph Matrix on Nothing Phone (3), which needs Nothing's own SDK.
+- Glyph matrix: on-screen 25 x 25 dot display (489 dots). Clock is static; Pulse, Spiral, Wave,
+  Breathe, Done, Charging, Tap and Low are short, event-driven bursts that end and then cost nothing
+  (no idle frame loop). It does not drive the physical Glyph Matrix on Nothing Phone (3), which needs
+  Nothing's own SDK.
+- Icon packs: Original, Mono, Hairline, Bold, Dot, Bubble and Tile. Every pack is derived from the
+  app's own themed (monochrome) layer when it ships one; apps without one keep their original icon.
+- Optional reactions, off by default: a finished focus session plays the Done reaction on the matrix,
+  and — only if you opt in — the camera light can flash too, bounded in code (3 flashes per second,
+  3 seconds per session, 12 per hour, a 10 second cool-down, and skipped in battery saver, Do Not
+  Disturb, reduced motion, when the device is warm, or below 15% battery while unplugged).
+- Call signals (Android 12+), off by default: the launcher notices an incoming call from the audio
+  mode only. A single accelerometer reading then picks face up (matrix pulse, never the torch) or face
+  down (torch, if enabled, and nothing on the matrix). No caller name, number, SMS, contact or call
+  log is ever read.
 - Side rail dock (vertical glass pill) as an alternative to the bottom dock.
 - Focus reminders every 5, 10 or 15 minutes while you are in a distracting app you opened from the launcher.
   Uses an inexact alarm and a notification. No accessibility, usage-access or overlay permission.
@@ -35,6 +47,11 @@ Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebu
 - ui/Glass.kt: liquid glass modifier
 - ui/Home.kt: layers, transitions, overlays
 - ui/Widgets.kt, ui/WidgetSheets.kt, ui/HostedWidgets.kt: widgets, add/edit sheets, Android widget hosting
+- ui/GlyphMatrix.kt: 25 x 25 mask (489 cells) and the event-driven reactions
+- ui/IconPacks.kt: the seven icon-pack renderers
+- ui/Personalization.kt: the Personalization hub and its Icons/Theme/Wallpaper/Home/Clock pages
+- reactions/TorchPolicy.kt, reactions/TorchController.kt: opt-in torch reactions and their safety rails
+- signals/SignalsTier0.kt: Tier 0 call signals (audio mode + one accelerometer reading)
 - ui/WallpaperEditor.kt, ui/Wallpapers.kt: wallpaper generation and editing
 - ui/AppViews.kt: app rows, scrubber, panel, docks
 - ui/Menus.kt, ui/Overlays.kt: menu bar, dropdowns, sheets

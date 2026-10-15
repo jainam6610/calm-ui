@@ -33,12 +33,14 @@ Developed by thats.jainam.
   - Your favourite apps in a clean list or grid, with an A to Z scrubber for everything else.
   - Liquid glass design, smooth spring animations and dot-matrix details.
   - Light and dark themes, your own wallpaper with blur, dim and zoom controls.
-  - Monochrome themed icons, or your original icons, in the shape you like.
+  - Monochrome themed icons, or your original icons, in the shape you like, with seven built-in
+    icon packs (Original, Mono, Hairline, Bold, Dot, Bubble, Tile).
 
   Widgets you can add, move, resize and remove
   - Clock (dot, digital, words or analog), date, week, battery
   - Next up, exam countdown, study timer, tasks
-  - Quick settings shortcuts, 3D dot sphere and a 25 by 25 glyph matrix display
+  - Quick settings shortcuts, 3D dot sphere and a 25 by 25 glyph matrix display with a static clock
+    and short, event-driven reactions (Pulse, Spiral, Wave, Breathe, Done, Charging, Tap)
   - Regular Android widgets too
 
   Focus tools
@@ -47,6 +49,9 @@ Developed by thats.jainam.
   - Optional reminders every 5, 10 or 15 minutes while you are in a distracting app.
     Reminders are plain notifications. The app only counts the time of apps you open from
     it — no accessibility, no usage access, no overlay and no special access.
+  - Optional, off-by-default reactions: a finished focus session can play a short matrix animation,
+    and (if you allow it) a brief camera-light flash with hard limits built in. Call signals use the
+    audio mode only and never read caller names, numbers, SMS, contacts or call logs.
 
   Private by design: no accounts, no ads, no tracking. Everything stays on your phone.
 

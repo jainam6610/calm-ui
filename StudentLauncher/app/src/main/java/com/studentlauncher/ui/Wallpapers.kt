@@ -64,6 +64,18 @@ object Wallpapers {
     private fun photoFile(ctx: Context, slot: Int): File =
         File(ctx.filesDir, if (slot == 0) "wallpaper.jpg" else "wallpaper$slot.jpg")
 
+    /**
+     * Pure: the smallest power-of-two [BitmapFactory] sample that still covers [target] on the
+     * long edge. Lets [build] avoid decoding a full-resolution photo just to crop it to screen
+     * size, which is the single largest allocation in the wallpaper path.
+     */
+    fun sampleSizeFor(srcW: Int, srcH: Int, target: Int): Int {
+        if (srcW <= 0 || srcH <= 0 || target <= 0) return 1
+        var s = 1
+        while (max(srcW, srcH) / (s * 2) >= target) s *= 2
+        return s
+    }
+
     /** Which shuffle slot to show for this local day. Pure: unit-testable via epochDay. */
     fun slotForDay(count: Int, epochDay: Long = LocalDate.now().toEpochDay()): Int {
         if (count <= 1) return 0
@@ -177,7 +189,10 @@ object Wallpapers {
         if (id == "photo" || id == "shuffle") {
             val f = photoFile(ctx, if (id == "shuffle") slot else 0)
             if (f.exists()) {
-                val src = BitmapFactory.decodeFile(f.path)
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(f.path, bounds)
+                val sample = sampleSizeFor(bounds.outWidth, bounds.outHeight, max(w, h))
+                val src = BitmapFactory.decodeFile(f.path, BitmapFactory.Options().apply { inSampleSize = sample })
                 if (src != null) {
                     val cropped = centerCrop(src, w, h)
                     Canvas(cropped).drawColor(if (dark) 0x66000000 else 0x22FFFFFF)
