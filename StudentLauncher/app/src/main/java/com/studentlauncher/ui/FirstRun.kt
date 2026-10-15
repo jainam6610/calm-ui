@@ -206,6 +206,30 @@ private fun SettingsRoot(vm: LauncherViewModel, requestNotifications: () -> Unit
             Txt("Looks-only settings, moved off the main list.", 12f, c.fg2)
         }
 
+        SettingSection("Reactions", if (vm.torchEnabled) (if (vm.torch.available) "Torch on" else "No torch found") else "Off") {
+            Txt(
+                "Flash the camera light when a focus session ends. Off by default. Never used for touch, breathing or low battery. Capped at 3 flashes per second, 3 seconds total, 12 per hour, with a 10 second cool-down; skipped in battery saver, Do Not Disturb, when warm, when battery is under 15% and charging is off, or with reduced motion.",
+                12f, c.fg2, maxLines = 8
+            )
+            Spacer(Modifier.height(10.dp))
+            SwitchSetting("Torch reactions", "Camera light flashes for finished sessions", vm.torchEnabled, vm::applyTorchEnabled)
+            if (!vm.torch.available) {
+                Spacer(Modifier.height(6.dp))
+                Txt("This device reports no flash unit, so torch reactions stay off.", 12f, c.fg2, maxLines = 2)
+            }
+            if (vm.torchEnabled) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PillButton("Test torch", { vm.testTorch() })
+                    PillButton("Preview Done", { vm.reactionDone() })
+                }
+                vm.torchNotice?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Txt(it, 12f, c.fg2, maxLines = 2)
+                }
+            }
+        }
+
         SettingSection("Focus") {
             SwitchSetting("Study mode", "Hide apps marked distracting", vm.studyMode, vm::applyStudyMode)
             SwitchSetting("Mindful Mode", "Escalating pauses + session tracking", vm.mindfulEnabled, vm::applyMindful)

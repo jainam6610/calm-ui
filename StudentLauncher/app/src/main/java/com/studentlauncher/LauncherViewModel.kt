@@ -2,11 +2,17 @@ package com.studentlauncher
 
 import android.app.ActivityOptions
 import android.app.Application
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +25,12 @@ import com.studentlauncher.mindful.MindfulEngine
 import com.studentlauncher.mindful.MindfulHost
 import com.studentlauncher.mindful.MindfulStore
 import com.studentlauncher.mindful.TaskRef
+import com.studentlauncher.reactions.Flash
+import com.studentlauncher.reactions.TorchConditions
+import com.studentlauncher.reactions.TorchController
+import com.studentlauncher.reactions.TorchPatterns
 import com.studentlauncher.security.PinLock
+import com.studentlauncher.ui.GlyphModes
 import com.studentlauncher.ui.PinMode
 import com.studentlauncher.ui.PinRequest
 import com.studentlauncher.ui.WpAdjust
@@ -27,6 +38,7 @@ import com.studentlauncher.ui.Wallpapers
 import com.studentlauncher.ui.encodeTasks
 import com.studentlauncher.ui.parseTasks
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -70,6 +82,98 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var uiFont by mutableStateOf(prefs.getString("uiFont", "system") ?: "system"); private set
     /** One global clock style for every clock widget (no per-widget override). */
     var clockStyle by mutableStateOf(prefs.getString("clockStyle", "Dot") ?: "Dot"); private set
+
+    // ---- torch reactions: opt-in, off by default, rate limited in code ----
+    val torch = TorchController(ctx, viewModelScope)
+    var torchEnabled by mutableStateOf(prefs.getBoolean("torchEnabled", false)); private set
+    var torchNotice by mutableStateOf<String?>(null); private set
+
+    fun applyTorchEnabled(v: Boolean) {
+        torchEnabled = v
+        putB("torchEnabled", v)
+        if (!v) {
+            torch.allOff()
+            torchNotice = null
+        }
+    }
+
+    /** Called when the activity starts so the light is never left on across a resume. */
+    fun onActivityStart() = torch.beginSession()
+
+    fun torchOff() = torch.allOff()
+
+    fun testTorch() {
+        val reason = torch.flash(TorchPatterns.TAP, torchConditions())
+        torchNotice = reason ?: "Test flash sent"
+        if (reason == null) {
+            viewModelScope.launch {
+                delay(3000)
+                if (torchNotice == "Test flash sent") torchNotice = null
+            }
+        }
+    }
+
+    private fun torchConditions(): TorchConditions = TorchConditions(
+        optedIn = torchEnabled,
+        reducedMotion = runCatching {
+            Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        }.getOrDefault(1f) <= 0f,
+        powerSave = runCatching {
+            (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager).isPowerSaveMode
+        }.getOrDefault(false),
+        thermalOk = runCatching {
+            if (Build.VERSION.SDK_INT >= 29) {
+                (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager).currentThermalStatus < PowerManager.THERMAL_STATUS_MODERATE
+            } else true
+        }.getOrDefault(true),
+        batteryPct = batteryInfo().first,
+        charging = batteryInfo().second,
+        quietNow = runCatching {
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
+        }.getOrDefault(false)
+    )
+
+    private fun batteryInfo(): Pair<Int, Boolean> = runCatching {
+        val i = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        var pct = 100
+        var charging = false
+        if (i != null) {
+            val l = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val s = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+            if (l >= 0 && s > 0) pct = l * 100 / s
+            val st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            charging = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL
+        }
+        pct to charging
+    }.getOrDefault(100 to false)
+
+    // ---- reactive matrix bursts ----
+    var reactionMode by mutableStateOf<String?>(null); private set
+    var reactionTick by mutableIntStateOf(0); private set
+
+    /**
+     * Plays a matrix reaction and, when opted in, the matching torch pattern. Only non-touch
+     * app events call this; touch, breathing and low-battery states never reach the torch.
+     */
+    fun fireReaction(mode: String, torchPattern: List<Flash>? = null) {
+        reactionMode = mode
+        reactionTick++
+        if (torchPattern != null && torchEnabled) {
+            torchNotice = torch.flash(torchPattern, torchConditions())
+        }
+        viewModelScope.launch {
+            val tick = reactionTick
+            delay(1800)
+            if (reactionTick == tick) reactionMode = null
+        }
+    }
+
+    /** A finished focus session: matrix check plus an optional two-flash torch. */
+    fun reactionDone() = fireReaction(GlyphModes.DONE, TorchPatterns.DONE)
+
+    /** A priority / important signal: three-flash torch pattern at 2.5 Hz. */
+    fun reactionAlert() = fireReaction(GlyphModes.PULSE, TorchPatterns.ALERT)
     var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
     var shuffleSlot by mutableStateOf(0); private set
@@ -423,6 +527,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         unlockApp(pkg, 10)
         pauseApp = null
         activeBrainTask = null
+        reactionDone()
     }
 
     // ---- mindful simple setters (v2 Settings) ----

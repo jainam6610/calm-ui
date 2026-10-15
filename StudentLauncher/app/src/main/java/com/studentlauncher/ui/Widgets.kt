@@ -1327,7 +1327,8 @@ private fun QuickContent(fg: Color) {
 
 @Composable
 private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent: Color, compact: Boolean) {
-    val mode = w.get("mode", GlyphModes.CLOCK)
+    val reaction = vm.reactionMode
+    val mode = reaction ?: w.get("mode", GlyphModes.CLOCK)
     var burst by remember { mutableIntStateOf(0) }
     val (batteryPct, charging) = rememberBattery()
     Box(
@@ -1342,7 +1343,7 @@ private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent
             fg,
             accent,
             Modifier.fillMaxWidth(if (compact) 0.55f else 0.62f).aspectRatio(1f),
-            burstKey = burst,
+            burstKey = if (reaction != null) vm.reactionTick else burst,
             batteryPct = batteryPct,
             charging = charging
         )
