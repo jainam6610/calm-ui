@@ -66,6 +66,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var motionIntensity by mutableStateOf(prefs.getFloat("motionIntensity", 1f)); private set
     var compactDensity by mutableStateOf(prefs.getBoolean("compactDensity", false)); private set
     var accentId by mutableStateOf(prefs.getString("accentId", "red") ?: "red"); private set
+    var wpAccent by mutableStateOf(prefs.getBoolean("wpAccent", false)); private set
     var uiFont by mutableStateOf(prefs.getString("uiFont", "system") ?: "system"); private set
     var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
@@ -142,7 +143,18 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val planTasks = mutableStateListOf<PlanTask>().apply { addAll(parsePlanTasks(prefs.getString("plan_tasks", "") ?: "")) }
     val planEvents = mutableStateListOf<PlanEvent>().apply { addAll(parsePlanEvents(prefs.getString("plan_events", "") ?: "")) }
 
-    init { refresh(); refreshMotionScale(); refreshShuffleSlot() }
+    init {
+        refresh()
+        refreshMotionScale()
+        refreshShuffleSlot()
+        viewModelScope.launch(Dispatchers.IO) {
+            Wallpapers.seedPreloads(ctx)
+            if (shuffleCount == 0) {
+                val sc = Wallpapers.savedCount(ctx)
+                if (sc > 0) withContext(Dispatchers.Main) { applyShuffleCount(sc) }
+            }
+        }
+    }
 
     // ---- loading ----
     fun refresh() {
@@ -648,6 +660,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun applyCompactDensity(v: Boolean) { compactDensity = v; putB("compactDensity", v) }
     fun applyAccent(id: String) { accentId = id; putS("accentId", id) }
+    fun applyWpAccent(v: Boolean) { wpAccent = v; putB("wpAccent", v) }
     fun applyUiFont(f: String) { uiFont = f; putS("uiFont", f) }
     fun effectiveMotion(): Float =
         if (sysAnimScale == 0f) 0f else (motionIntensity * sysAnimScale).coerceIn(0f, 1f)

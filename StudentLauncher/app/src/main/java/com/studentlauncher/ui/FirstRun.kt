@@ -174,7 +174,7 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
 
         SettingSection("Home", "${vm.pinned.size}/${vm.homeAppLimit} apps") {
             Txt("Icon style", 12f, c.fg2)
-            Segmented(listOf(IconStyle.Mono to "Mono", IconStyle.Original to "Original"), vm.iconStyle, vm::applyIconStyle)
+            Segmented(listOf(IconStyle.Mono to "Mono", IconStyle.Original to "Original", IconStyle.MinimalBubble to "Bubble", IconStyle.MinimalOutline to "Outline"), vm.iconStyle, vm::applyIconStyle)
             Spacer(Modifier.height(8.dp))
             Txt("Icon shape", 12f, c.fg2)
             Segmented(listOf(IconShape.None to "None", IconShape.Circle to "Circle", IconShape.Squircle to "Squircle"), vm.iconShape, vm::applyIconShape)
@@ -267,6 +267,8 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
                 vm::applyTheme
             )
             Spacer(Modifier.height(10.dp))
+            SwitchSetting("Wallpaper accent", "Picks accent colour from your wallpaper", vm.wpAccent, vm::applyWpAccent)
+            Spacer(Modifier.height(10.dp))
             Txt("Accent", 12f, c.fg2)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf("red", "blue", "green", "purple", "orange", "teal", "pink").forEach { id ->
@@ -330,7 +332,7 @@ fun SettingsApp(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShufflePhotos:
 
         SettingSection("Advanced", "${(vm.motionIntensity * 100).toInt()}% motion") {
             Txt("Font", 12f, c.fg2)
-            Segmented(listOf("system" to "System", "serif" to "Serif", "mono" to "Mono", "poppins" to "Poppins"), vm.uiFont, vm::applyUiFont)
+            Segmented(listOf("system" to "System", "serif" to "Serif", "mono" to "Mono", "poppins" to "Poppins", "geist" to "Geist"), vm.uiFont, vm::applyUiFont)
             Spacer(Modifier.height(10.dp))
             SwitchSetting("Compact density", "Fit more without changing text size", vm.compactDensity, vm::applyCompactDensity)
             Spacer(Modifier.height(8.dp))

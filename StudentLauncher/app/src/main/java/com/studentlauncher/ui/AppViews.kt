@@ -100,18 +100,31 @@ fun AppIconView(app: AppInfo, vm: LauncherViewModel, size: Dp, modifier: Modifie
         IconShape.Squircle -> RoundedCornerShape(size * 0.32f)
         IconShape.None -> RectangleShape
     }
-    val container = if (vm.iconShape == IconShape.None) Modifier else Modifier
-        .clip(shape)
-        .background(c.tile)
-        .border(
-            0.8.dp,
-            Brush.linearGradient(listOf(Color.White.copy(alpha = if (c.dark) 0.35f else 0.9f), Color.White.copy(alpha = 0.08f))),
-            shape
-        )
+    val container = when (vm.iconStyle) {
+        IconStyle.MinimalBubble -> Modifier
+            .clip(CircleShape)
+            .border(1.5.dp, c.fg2.copy(alpha = 0.5f), CircleShape)
+        IconStyle.MinimalOutline -> Modifier
+            .clip(RoundedCornerShape(size * 0.28f))
+            .border(1.5.dp, c.fg2.copy(alpha = 0.5f), RoundedCornerShape(size * 0.28f))
+        else -> if (vm.iconShape == IconShape.None) Modifier else Modifier
+            .clip(shape)
+            .background(c.tile)
+            .border(
+                0.8.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = if (c.dark) 0.35f else 0.9f), Color.White.copy(alpha = 0.08f))),
+                shape
+            )
+    }
     Box(modifier.size(size).then(container), contentAlignment = Alignment.Center) {
         if (ic != null) {
-            val mono = vm.iconStyle == IconStyle.Mono
-            val pad = if (vm.iconShape == IconShape.None) 0.dp else size * 0.2f
+            val isMinimal = vm.iconStyle == IconStyle.MinimalBubble || vm.iconStyle == IconStyle.MinimalOutline
+            val mono = vm.iconStyle == IconStyle.Mono || isMinimal
+            val pad = when {
+                isMinimal -> size * 0.22f
+                vm.iconShape == IconShape.None -> 0.dp
+                else -> size * 0.2f
+            }
             when {
                 mono && ic.mono != null ->
                     Image(ic.mono, null, Modifier.fillMaxSize().padding(pad), colorFilter = ColorFilter.tint(c.fg))

@@ -10,7 +10,7 @@ class AppIcons(val original: ImageBitmap, val mono: ImageBitmap?)
 
 enum class ThemeMode { Light, Dark, System }
 enum class IconShape { None, Circle, Squircle }
-enum class IconStyle { Mono, Original }
+enum class IconStyle { Mono, Original, MinimalBubble, MinimalOutline }
 enum class HomeLayout { List, Grid }
 enum class AlphaSide { Right, Left, Off }
 enum class DockStyle { Bottom, Rail, Off }

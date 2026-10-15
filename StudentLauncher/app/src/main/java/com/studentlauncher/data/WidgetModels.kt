@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-enum class WidgetBg { Glass, Solid, None }
+enum class WidgetBg { Glass, Solid, None, Frosted }
 
 /** Widget type ids and the catalog shown in "Add a widget". */
 object WT {

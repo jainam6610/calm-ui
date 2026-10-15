@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -95,7 +96,6 @@ fun LauncherRoot(
         ThemeMode.Dark -> true
         ThemeMode.System -> isSystemInDarkTheme()
     }
-    val colors = remember(dark, vm.accentId) { launcherColors(dark, accentColor(vm.accentId)) }
     val view = LocalView.current
     val ctx = LocalContext.current
 
@@ -120,6 +120,12 @@ fun LauncherRoot(
             set = withContext(Dispatchers.Default) { Wallpapers.build(ctx, id, dark, wPx, hPx, adj, slot) }
         }
         val env = remember(set, dark) { GlassEnv(set?.blurred, dark, wPx) }
+        val accent = if (vm.wpAccent && set != null) {
+            remember(set, vm.wpAccent) {
+                Wallpapers.dominantColor(set!!.blurred.asAndroidBitmap())
+            }
+        } else accentColor(vm.accentId)
+        val colors = remember(dark, accent) { launcherColors(dark, accent) }
 
         CompositionLocalProvider(
             LocalColors provides colors,

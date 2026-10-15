@@ -148,7 +148,7 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
         } else {
             SLabel("Background")
             Segmented(
-                listOf(WidgetBg.Glass to "Glass", WidgetBg.Solid to "Solid", WidgetBg.None to "None"),
+                listOf(WidgetBg.Glass to "Glass", WidgetBg.Solid to "Solid", WidgetBg.None to "None", WidgetBg.Frosted to "Frosted"),
                 w.bg, { v -> vm.updateWidget(id) { it.copy(bg = v) } }
             )
             SLabel("Height")
@@ -203,11 +203,18 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                 listOf(
                     listOf("Dot", "Digital", "Words", "Analog"),
                     listOf("Flip", "Split-Flap", "Retro Pixel", "Thin"),
-                    listOf("Bold", "Neon", "Binary", "Roman", "Gradient")
+                    listOf("Bold", "Neon", "Binary", "Roman"),
+                    listOf("Gradient", "Glyph Arc", "Micrographics"),
+                    listOf("Day Name", "Segment LCD")
                 ).forEach { row ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         row.forEach { s ->
-                            val on = s == cur
+                            val on = s == cur ||
+                                (s == "Dot" && cur == "c1") ||
+                                (s == "Glyph Arc" && cur == "c2") ||
+                                (s == "Micrographics" && cur == "c3") ||
+                                (s == "Day Name" && cur == "c4") ||
+                                (s == "Segment LCD" && cur == "c5")
                             Box(
                                 Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(8.dp))
                                     .background(if (on) LocalColors.current.knob else LocalColors.current.track)

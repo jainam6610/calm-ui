@@ -116,6 +116,53 @@ object Wallpapers {
         for (slot in write until MAX_SHUFFLE) removePhoto(ctx, slot)
     }
 
+    /** Copy bundled preload WebPs to filesDir slots 0..n-1 only if those slots are empty. */
+    fun seedPreloads(ctx: Context) {
+        val seeds = listOf(com.studentlauncher.R.raw.preload_sky, com.studentlauncher.R.raw.preload_forest)
+        seeds.forEachIndexed { i, rawId ->
+            val dest = photoFile(ctx, i)
+            if (!dest.exists()) {
+                runCatching {
+                    ctx.resources.openRawResource(rawId).use { src ->
+                        dest.outputStream().use { src.copyTo(it) }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Samples dominant hue from the wallpaper bitmap to produce an adaptive accent colour. */
+    fun dominantColor(bmp: Bitmap): androidx.compose.ui.graphics.Color {
+        return runCatching {
+            val small = Bitmap.createScaledBitmap(bmp, 16, 16, false)
+            val buckets = FloatArray(16)
+            val hsv = FloatArray(3)
+            var maxCount = 0f
+            var domHue = 0f
+            for (x in 0 until 16 step 2) {
+                for (y in 0 until 16 step 2) {
+                    val p = small.getPixel(x, y)
+                    Color.colorToHSV(p, hsv)
+                    if (hsv[1] >= 0.15f && hsv[2] in 0.15f..0.95f) {
+                        val idx = ((hsv[0] / 360f) * 16).toInt().coerceIn(0, 15)
+                        buckets[idx] += 1f
+                        if (buckets[idx] > maxCount) {
+                            maxCount = buckets[idx]
+                            domHue = (idx + 0.5f) * (360f / 16f)
+                        }
+                    }
+                }
+            }
+            if (small != bmp) small.recycle()
+            if (maxCount > 0f) {
+                val rgb = Color.HSVToColor(floatArrayOf(domHue, 0.75f, 0.9f))
+                androidx.compose.ui.graphics.Color(rgb)
+            } else {
+                androidx.compose.ui.graphics.Color(0xFFE50914)
+            }
+        }.getOrDefault(androidx.compose.ui.graphics.Color(0xFFE50914))
+    }
+
     private fun centerCrop(src: Bitmap, w: Int, h: Int): Bitmap {
         val s = max(w / src.width.toFloat(), h / src.height.toFloat())
         val dw = src.width * s

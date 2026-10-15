@@ -126,6 +126,12 @@ fun fontFamilyOf(id: String): FontFamily = when (id) {
         Font(com.studentlauncher.R.font.poppins_regular, FontWeight.Normal),
         Font(com.studentlauncher.R.font.poppins_medium, FontWeight.Medium)
     )
+    // OFL fonts bundled in res/font (see app/OFL-GEIST.txt)
+    "geist" -> FontFamily(
+        Font(com.studentlauncher.R.font.geist_light, FontWeight.Light),
+        Font(com.studentlauncher.R.font.geist_regular, FontWeight.Normal),
+        Font(com.studentlauncher.R.font.geist_medium, FontWeight.Medium)
+    )
     else -> FontFamily.Default
 }
 

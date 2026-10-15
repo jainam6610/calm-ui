@@ -67,6 +67,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -347,6 +349,9 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                         WidgetBg.Glass -> Modifier.glass(12.dp).border(1.dp, stroke, RoundedCornerShape(12.dp))
                         WidgetBg.Solid -> Modifier.clip(RoundedCornerShape(12.dp)).background(if (c.dark) Color(0xFF1C1C1E) else Color.White).border(1.dp, stroke, RoundedCornerShape(12.dp))
                         WidgetBg.None -> if (selected || arranging) Modifier.border(1.dp, stroke, RoundedCornerShape(12.dp)) else Modifier
+                        WidgetBg.Frosted -> Modifier.glass(12.dp).drawBehind {
+                            drawRect(if (c.dark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.35f))
+                        }.border(1.dp, stroke, RoundedCornerShape(12.dp))
                     }
                 )
                 .pointerInput(w.id) {
@@ -605,6 +610,10 @@ private fun ClockContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
             Txt("${roman(h)}:${roman(now.minute).ifBlank { "—" }}", 42f, fg, FontWeight.Light, maxLines = 1)
         }
         "Gradient" -> GradientText(time, accent, fg)
+        "c2", "Glyph Arc" -> GlyphArcClock(now, time, fg, fg2, accent)
+        "c3", "Micrographics" -> MicrographicsClock(now, is24, fg, fg2, accent)
+        "c4", "Day Name" -> DayNameClock(now, is24, fg, fg2, accent)
+        "c5", "Segment LCD" -> SegmentLcdClock(now, is24, fg, fg2, accent)
         else -> DotText(time, Modifier.fillMaxWidth().aspectRatio(dotCols(time) / 7f), fg, accent)
     }
     if (w.get("date", "1") == "1") {
@@ -624,7 +633,8 @@ private fun ClockContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
 
 private val CLOCK_STYLES = listOf(
     "Dot", "Digital", "Words", "Analog", "Flip", "Split-Flap", "Retro Pixel",
-    "Thin", "Bold", "Neon", "Binary", "Roman", "Gradient"
+    "Thin", "Bold", "Neon", "Binary", "Roman", "Gradient",
+    "Glyph Arc", "Micrographics", "Day Name", "Segment LCD"
 )
 
 private val DATE_FORMATS = listOf(
@@ -640,6 +650,201 @@ private fun MonoText(text: String, size: Float, color: Color, weight: FontWeight
         text,
         style = TextStyle(color = color, fontSize = size.sp, fontWeight = weight, fontFamily = FontFamily.Monospace)
     )
+}
+
+@Composable
+private fun GlyphArcClock(now: LocalDateTime, time: String, fg: Color, fg2: Color, accent: Color) {
+    Column(Modifier.fillMaxWidth()) {
+        MonoText(time, 52f, fg, FontWeight.Light)
+        Spacer(Modifier.height(8.dp))
+        Canvas(Modifier.fillMaxWidth().height(16.dp)) {
+            val strokeW = 2.5f.dp.toPx()
+            val y = size.height / 2f
+            drawLine(
+                color = fg2.copy(alpha = 0.22f),
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = strokeW,
+                cap = StrokeCap.Round
+            )
+            val frac = ((now.minute * 60 + now.second) / 3600f).coerceIn(0f, 1f)
+            val activeX = size.width * frac
+            if (activeX > 0f) {
+                drawLine(
+                    color = accent,
+                    start = Offset(0f, y),
+                    end = Offset(activeX, y),
+                    strokeWidth = strokeW,
+                    cap = StrokeCap.Round
+                )
+            }
+            for (i in 0..12) {
+                val tickX = size.width * (i / 12f)
+                val passed = (now.minute / 5) >= i
+                drawCircle(
+                    color = if (passed) accent else fg2.copy(alpha = 0.45f),
+                    radius = 2.5f.dp.toPx(),
+                    center = Offset(tickX, y)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MicrographicsClock(now: LocalDateTime, is24: Boolean, fg: Color, fg2: Color, accent: Color) {
+    val h = if (is24) String.format("%02d", now.hour) else String.format("%02d", ((now.hour + 11) % 12) + 1)
+    val m = String.format("%02d", now.minute)
+    val s = String.format("%02d", now.second)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Column {
+                Txt("HR", 10f, fg2, FontWeight.Bold)
+                MonoText(h, 44f, fg, FontWeight.Light)
+            }
+            Column {
+                Txt("MIN", 10f, fg2, FontWeight.Bold)
+                MonoText(m, 44f, fg, FontWeight.Light)
+            }
+            Column {
+                Txt("SEC", 10f, accent, FontWeight.Bold)
+                MonoText(s, 44f, accent, FontWeight.Medium)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Canvas(Modifier.fillMaxWidth().height(10.dp)) {
+            val step = size.width / 30f
+            for (i in 0 until 30) {
+                val x = i * step + step / 2f
+                val active = (now.second / 2) >= i
+                drawLine(
+                    color = if (active) accent else fg2.copy(alpha = 0.2f),
+                    start = Offset(x, if (i % 5 == 0) 0f else 3f.dp.toPx()),
+                    end = Offset(x, size.height),
+                    strokeWidth = 1.5f.dp.toPx()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayNameClock(now: LocalDateTime, is24: Boolean, fg: Color, fg2: Color, accent: Color) {
+    val dayName = now.format(DateTimeFormatter.ofPattern("EEE.", Locale.getDefault()))
+    val timeStr = now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a"))
+    val dateStr = now.format(DateTimeFormatter.ofPattern("MMM d"))
+    Column(Modifier.fillMaxWidth()) {
+        Txt(dayName, 58f, fg, FontWeight.Light)
+        Spacer(Modifier.height(2.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MonoText(timeStr, 20f, accent, FontWeight.Medium)
+            Txt("  /  $dateStr", 15f, fg2, FontWeight.Light)
+        }
+    }
+}
+
+@Composable
+private fun SegmentLcdClock(now: LocalDateTime, is24: Boolean, fg: Color, fg2: Color, accent: Color) {
+    val h = if (is24) String.format("%02d", now.hour) else String.format("%02d", ((now.hour + 11) % 12) + 1)
+    val m = String.format("%02d", now.minute)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LcdDigit(h[0], fg)
+        LcdDigit(h[1], fg)
+        LcdColon(accent)
+        LcdDigit(m[0], fg)
+        LcdDigit(m[1], fg)
+    }
+}
+
+@Composable
+private fun LcdColon(color: Color) {
+    Canvas(Modifier.size(10.dp, 44.dp)) {
+        val r = 2.5f.dp.toPx()
+        val cx = size.width / 2f
+        drawCircle(color, r, Offset(cx, size.height * 0.35f))
+        drawCircle(color, r, Offset(cx, size.height * 0.65f))
+    }
+}
+
+@Composable
+private fun LcdDigit(digit: Char, fg: Color) {
+    val mask = when (digit) {
+        '0' -> 0b1111110
+        '1' -> 0b0110000
+        '2' -> 0b1101101
+        '3' -> 0b1111001
+        '4' -> 0b0110011
+        '5' -> 0b1011011
+        '6' -> 0b1011111
+        '7' -> 0b1110000
+        '8' -> 0b1111111
+        '9' -> 0b1111011
+        else -> 0b0000000
+    }
+    Canvas(Modifier.size(24.dp, 44.dp)) {
+        val t = size.width * 0.16f
+        val gap = 1f.dp.toPx()
+        val dimColor = fg.copy(alpha = 0.08f)
+        fun col(bit: Int) = if ((mask and (1 shl bit)) != 0) fg else dimColor
+
+        // a (bit 6): top horizontal
+        drawRoundRect(
+            color = col(6),
+            topLeft = Offset(t + gap, 0f),
+            size = Size((size.width - 2 * t - 2 * gap).coerceAtLeast(1f), t),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+        // b (bit 5): top-right vertical
+        drawRoundRect(
+            color = col(5),
+            topLeft = Offset(size.width - t, t + gap),
+            size = Size(t, ((size.height - 3 * t) / 2f - 2 * gap).coerceAtLeast(1f)),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+        // c (bit 4): bottom-right vertical
+        drawRoundRect(
+            color = col(4),
+            topLeft = Offset(size.width - t, (size.height + t) / 2f + gap),
+            size = Size(t, ((size.height - 3 * t) / 2f - 2 * gap).coerceAtLeast(1f)),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+        // d (bit 3): bottom horizontal
+        drawRoundRect(
+            color = col(3),
+            topLeft = Offset(t + gap, size.height - t),
+            size = Size((size.width - 2 * t - 2 * gap).coerceAtLeast(1f), t),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+        // e (bit 2): bottom-left vertical
+        drawRoundRect(
+            color = col(2),
+            topLeft = Offset(0f, (size.height + t) / 2f + gap),
+            size = Size(t, ((size.height - 3 * t) / 2f - 2 * gap).coerceAtLeast(1f)),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+        // f (bit 1): top-left vertical
+        drawRoundRect(
+            color = col(1),
+            topLeft = Offset(0f, t + gap),
+            size = Size(t, ((size.height - 3 * t) / 2f - 2 * gap).coerceAtLeast(1f)),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+        // g (bit 0): middle horizontal
+        drawRoundRect(
+            color = col(0),
+            topLeft = Offset(t + gap, (size.height - t) / 2f),
+            size = Size((size.width - 2 * t - 2 * gap).coerceAtLeast(1f), t),
+            cornerRadius = CornerRadius(t / 3f, t / 3f)
+        )
+    }
 }
 
 @Composable
