@@ -53,7 +53,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var wpZoom by mutableStateOf(prefs.getFloat("wpZoom", 1f)); private set
     var wpPanX by mutableStateOf(prefs.getFloat("wpPanX", 0f)); private set
     var wpPanY by mutableStateOf(prefs.getFloat("wpPanY", 0f)); private set
-    var iconStyle by mutableStateOf(enumPref("iconStyle", IconStyle.Mono)); private set
+    var iconPack by mutableStateOf(loadIconPack()); private set
     var iconShape by mutableStateOf(enumPref("iconShape", IconShape.Squircle)); private set
     var layout by mutableStateOf(enumPref("layout", HomeLayout.List)); private set
     var alphaSide by mutableStateOf(enumPref("alphaSide", AlphaSide.Right)); private set
@@ -642,7 +642,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun applyTheme(v: ThemeMode) { themeMode = v; putS("theme", v.name) }
     fun applyWallpaper(id: String) { wallpaper = id; putS("wallpaper", id) }
-    fun applyIconStyle(v: IconStyle) { iconStyle = v; putS("iconStyle", v.name) }
+    fun applyIconPack(v: IconPack) { iconPack = v; putS("iconPack", v.name) }
+
+    /** Reads the icon pack, migrating the pre-3.1 `iconStyle` values to the new pack names. */
+    private fun loadIconPack(): IconPack =
+        iconPackFromStored(prefs.getString("iconPack", null) ?: prefs.getString("iconStyle", null))
     fun applyIconShape(v: IconShape) { iconShape = v; putS("iconShape", v.name) }
     fun applyLayout(v: HomeLayout) { layout = v; putS("layout", v.name) }
     fun applyAlphaSide(v: AlphaSide) { alphaSide = v; putS("alphaSide", v.name) }

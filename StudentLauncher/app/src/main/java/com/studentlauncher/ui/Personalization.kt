@@ -34,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.studentlauncher.LauncherViewModel
 import com.studentlauncher.data.DockStyle
 import com.studentlauncher.data.HomeLayout
+import com.studentlauncher.data.IconPack
 import com.studentlauncher.data.IconShape
-import com.studentlauncher.data.IconStyle
 import com.studentlauncher.data.SettingsPage
 import com.studentlauncher.data.ThemeMode
 
@@ -90,12 +90,7 @@ private fun HubRow(title: String, summary: String, onClick: () -> Unit) {
 
 @Composable
 internal fun PersonalizationHub(vm: LauncherViewModel) {
-    val iconsSummary = when (vm.iconStyle) {
-        IconStyle.Mono -> "Mono"
-        IconStyle.Original -> "Original"
-        IconStyle.MinimalBubble -> "Bubble"
-        IconStyle.MinimalOutline -> "Outline"
-    }
+    val iconsSummary = vm.iconPack.name
     val themeSummary = when (vm.themeMode) {
         ThemeMode.Dark -> "Dark"
         ThemeMode.Light -> "Light"
@@ -124,17 +119,23 @@ internal fun PersonalizationHub(vm: LauncherViewModel) {
 internal fun IconsPage(vm: LauncherViewModel) {
     val c = LocalColors.current
     SettingsScaffold("Icons", onBack = { vm.settingsPage = SettingsPage.Personalization }) {
-        SettingSection("Style") {
-            Segmented(
-                listOf(
-                    IconStyle.Original to "Original",
-                    IconStyle.Mono to "Mono",
-                    IconStyle.MinimalBubble to "Bubble",
-                    IconStyle.MinimalOutline to "Outline"
-                ),
-                vm.iconStyle,
-                vm::applyIconStyle
-            )
+        SettingSection("Icon pack", vm.iconPack.name) {
+            Txt("One glyph, several styles. Apps without a themed layer keep their original icon.", 12f, c.fg2, maxLines = 3)
+            Spacer(Modifier.height(10.dp))
+            ICON_PACKS.chunked(3).forEach { row ->
+                Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    row.forEach { p ->
+                        val on = p == vm.iconPack
+                        Box(
+                            Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp))
+                                .background(if (on) c.knob else c.track)
+                                .tap { vm.applyIconPack(p) },
+                            contentAlignment = Alignment.Center
+                        ) { Txt(p.name, 11f, if (on) Color(0xFF1C1C1E) else c.fg, maxLines = 1) }
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
         }
         SettingSection("Shape") {
             Segmented(
@@ -145,6 +146,10 @@ internal fun IconsPage(vm: LauncherViewModel) {
         }
     }
 }
+
+private val ICON_PACKS = listOf(
+    IconPack.Original, IconPack.Mono, IconPack.Hairline, IconPack.Bold, IconPack.Dot, IconPack.Bubble, IconPack.Tile
+)
 
 @Composable
 internal fun ThemePage(vm: LauncherViewModel) {

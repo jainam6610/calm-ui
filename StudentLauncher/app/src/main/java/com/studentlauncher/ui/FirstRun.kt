@@ -45,7 +45,6 @@ import com.studentlauncher.data.DockStyle
 import com.studentlauncher.data.HomeLayout
 import com.studentlauncher.data.InternalDestination
 import com.studentlauncher.data.IconShape
-import com.studentlauncher.data.IconStyle
 import com.studentlauncher.data.SettingsPage
 import com.studentlauncher.data.ThemeMode
 
