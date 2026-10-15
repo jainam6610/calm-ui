@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         vm.onActivityStart()
+        vm.startSignals()
         vm.hostMgr.start()
     }
 
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         vm.torchOff()
+        vm.stopSignals()
         vm.hostMgr.stop()
         super.onStop()
     }

@@ -30,6 +30,8 @@ import com.studentlauncher.reactions.TorchConditions
 import com.studentlauncher.reactions.TorchController
 import com.studentlauncher.reactions.TorchPatterns
 import com.studentlauncher.security.PinLock
+import com.studentlauncher.signals.Flip
+import com.studentlauncher.signals.SignalsMonitor
 import com.studentlauncher.ui.GlyphModes
 import com.studentlauncher.ui.PinMode
 import com.studentlauncher.ui.PinRequest
@@ -174,6 +176,41 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** A priority / important signal: three-flash torch pattern at 2.5 Hz. */
     fun reactionAlert() = fireReaction(GlyphModes.PULSE, TorchPatterns.ALERT)
+
+    // ---- Tier 0 signals: calls only, from AudioManager; no caller identity, no permissions ----
+    var signalsEnabled by mutableStateOf(prefs.getBoolean("signalsEnabled", false)); private set
+    private val signals = SignalsMonitor(ctx) { flip -> onCallFlip(flip) }
+
+    /** True when the platform can report audio-mode changes (API 31+). */
+    val signalsAvailable: Boolean get() = signals.available
+
+    fun applySignalsEnabled(v: Boolean) {
+        signalsEnabled = v
+        putB("signalsEnabled", v)
+        if (v) signals.start() else signals.stop()
+    }
+
+    fun startSignals() {
+        if (signalsEnabled) signals.start()
+    }
+
+    fun stopSignals() = signals.stop()
+
+    /**
+     * One accelerometer reading decides how a call is surfaced. Face up lights the matrix and
+     * never the torch; face down uses the torch only and keeps the matrix hidden; unknown means
+     * no reaction at all. No caller name, number or message content is ever read.
+     */
+    private fun onCallFlip(flip: Flip) {
+        if (!signalsEnabled) return
+        when (flip) {
+            Flip.FaceUp -> fireReaction(GlyphModes.PULSE, null)
+            Flip.FaceDown -> if (torchEnabled) {
+                torchNotice = torch.flash(TorchPatterns.ALERT, torchConditions())
+            }
+            Flip.Unknown -> Unit
+        }
+    }
     var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
     var shuffleSlot by mutableStateOf(0); private set

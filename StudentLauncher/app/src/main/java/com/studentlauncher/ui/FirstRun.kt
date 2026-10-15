@@ -230,6 +230,19 @@ private fun SettingsRoot(vm: LauncherViewModel, requestNotifications: () -> Unit
             }
         }
 
+        SettingSection("Signals (calls)", if (!vm.signalsAvailable) "Needs Android 12+" else if (vm.signalsEnabled) "On" else "Off") {
+            Txt(
+                "When a call comes in, one accelerometer reading decides the reaction: face up shows a matrix pulse and never the torch; face down uses the torch (if enabled) and stays off the matrix; in a pocket does nothing. Calls are detected from the audio mode alone. The launcher never reads caller names, numbers, SMS, contacts or call logs, and nothing is stored.",
+                12f, c.fg2, maxLines = 8
+            )
+            Spacer(Modifier.height(10.dp))
+            if (!vm.signalsAvailable) {
+                Txt("Audio-mode call detection needs Android 12 or newer.", 12f, c.fg2, maxLines = 2)
+            } else {
+                SwitchSetting("Call signals", "React when a call arrives", vm.signalsEnabled, vm::applySignalsEnabled)
+            }
+        }
+
         SettingSection("Focus") {
             SwitchSetting("Study mode", "Hide apps marked distracting", vm.studyMode, vm::applyStudyMode)
             SwitchSetting("Mindful Mode", "Escalating pauses + session tracking", vm.mindfulEnabled, vm::applyMindful)
