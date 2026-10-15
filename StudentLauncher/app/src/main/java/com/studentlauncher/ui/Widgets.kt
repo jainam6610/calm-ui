@@ -543,7 +543,7 @@ fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, c
     }
     Column(Modifier.heightIn(max = maxContentH)) {
         when (w.type) {
-            WT.CLOCK -> ClockContent(w, fg, fg2, accent)
+            WT.CLOCK -> ClockContent(w, vm.clockStyle, fg, fg2, accent)
             WT.DATE -> DateContent(fg, fg2)
             WT.WEEK -> WeekContent(w, fg, fg2, accent)
             WT.BATTERY -> BatteryContent(fg, accent)
@@ -582,14 +582,14 @@ fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, c
 // ---------------------------------------------------------------------------------------------
 
 @Composable
-private fun ClockContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
+private fun ClockContent(w: WidgetItem, style: String, fg: Color, fg2: Color, accent: Color) {
     val now = rememberNow()
     val ctx = LocalContext.current
     val sys24 = remember { DateFormat.is24HourFormat(ctx) }
     val is24 = when (w.get("fmt", "sys")) { "24" -> true; "12" -> false; else -> sys24 }
     val time = now.format(DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a"))
     var q by remember { mutableIntStateOf(0) }
-    when (w.get("style", "Dot")) {
+    when (style) {
         "Digital" -> Txt(time, 54f, fg, FontWeight.Light)
         "Words" -> {
             Txt(hourWord(now.hour), 40f, fg, FontWeight.Bold)
@@ -631,7 +631,7 @@ private fun ClockContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
     }
 }
 
-private val CLOCK_STYLES = listOf(
+internal val CLOCK_STYLES = listOf(
     "Dot", "Digital", "Words", "Analog", "Flip", "Split-Flap", "Retro Pixel",
     "Thin", "Bold", "Neon", "Binary", "Roman", "Gradient",
     "Glyph Arc", "Micrographics", "Day Name", "Segment LCD"

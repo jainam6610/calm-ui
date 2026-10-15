@@ -198,32 +198,6 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                 Txt("Edit this widget's content directly on the home screen.", 12f, c.fg2, maxLines = 2)
             }
             WT.CLOCK -> {
-                SLabel("Style")
-                val cur = w.get("style", "Dot")
-                listOf(
-                    listOf("Dot", "Digital", "Words", "Analog"),
-                    listOf("Flip", "Split-Flap", "Retro Pixel", "Thin"),
-                    listOf("Bold", "Neon", "Binary", "Roman"),
-                    listOf("Gradient", "Glyph Arc", "Micrographics"),
-                    listOf("Day Name", "Segment LCD")
-                ).forEach { row ->
-                    Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        row.forEach { s ->
-                            val on = s == cur ||
-                                (s == "Dot" && cur == "c1") ||
-                                (s == "Glyph Arc" && cur == "c2") ||
-                                (s == "Micrographics" && cur == "c3") ||
-                                (s == "Day Name" && cur == "c4") ||
-                                (s == "Segment LCD" && cur == "c5")
-                            Box(
-                                Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(8.dp))
-                                    .background(if (on) LocalColors.current.knob else LocalColors.current.track)
-                                    .tap { vm.setCfg(id, "style", s) },
-                                contentAlignment = Alignment.Center
-                            ) { Txt(s, 11f, if (on) Color(0xFF1C1C1E) else LocalColors.current.fg, maxLines = 1) }
-                        }
-                    }
-                }
                 SLabel("Time format")
                 Segmented(listOf("sys" to "System", "12" to "12 h", "24" to "24 h"), w.get("fmt", "sys"), { vm.setCfg(id, "fmt", it) })
                 SwitchLine("Show date", w.get("date", "1") == "1") { vm.setCfg(id, "date", if (it) "1" else "0") }

@@ -68,6 +68,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var accentId by mutableStateOf(prefs.getString("accentId", "red") ?: "red"); private set
     var wpAccent by mutableStateOf(prefs.getBoolean("wpAccent", false)); private set
     var uiFont by mutableStateOf(prefs.getString("uiFont", "system") ?: "system"); private set
+    /** One global clock style for every clock widget (no per-widget override). */
+    var clockStyle by mutableStateOf(prefs.getString("clockStyle", "Dot") ?: "Dot"); private set
     var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
     var shuffleSlot by mutableStateOf(0); private set
@@ -87,6 +89,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var unlockUntil by mutableStateOf(prefs.getLong("unlock_until", 0L)); private set
 
     var destination by mutableStateOf(InternalDestination.Home)
+    /** Active sub-page of the Settings app; [SettingsPage.Root] is the top-level list. */
+    var settingsPage by mutableStateOf(SettingsPage.Root)
 
     val pinned = mutableStateListOf<String>().apply { addAll(csv("pinned")) }
     val dock = mutableStateListOf<String>().apply { addAll(csv("dock")) }
@@ -227,9 +231,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun onScrubRelease(i: Int) { if (i == 27) destination = InternalDestination.Settings }
+    fun onScrubRelease(i: Int) { if (i == 27) { settingsPage = SettingsPage.Root; destination = InternalDestination.Settings } }
 
-    fun goHome() { view = ViewMode.Home; query = ""; ctxApp = null }
+    fun goHome() { view = ViewMode.Home; query = ""; ctxApp = null; settingsPage = SettingsPage.Root }
 
     fun onHomePressed() {
         goHome()
@@ -242,6 +246,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         selectedWidgetId = null
         activeBrainTask = null
         destination = InternalDestination.Home
+        settingsPage = SettingsPage.Root
         mindful.cancelDoor(false)
         mindful.settingsOpen = false
         mindful.appLimitsOpen = false
@@ -251,6 +256,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun back() {
         when {
+            settingsPage != SettingsPage.Root -> settingsPage = SettingsPage.Root
             wallpaperEditor -> wallpaperEditor = false
             pickHomeApps -> pickHomeApps = false
             aboutOpen -> aboutOpen = false
@@ -662,6 +668,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun applyAccent(id: String) { accentId = id; putS("accentId", id) }
     fun applyWpAccent(v: Boolean) { wpAccent = v; putB("wpAccent", v) }
     fun applyUiFont(f: String) { uiFont = f; putS("uiFont", f) }
+    fun applyClockStyle(s: String) { clockStyle = s; putS("clockStyle", s) }
     fun effectiveMotion(): Float =
         if (sysAnimScale == 0f) 0f else (motionIntensity * sysAnimScale).coerceIn(0f, 1f)
 

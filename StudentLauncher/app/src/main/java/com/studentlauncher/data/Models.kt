@@ -18,6 +18,9 @@ enum class ViewMode { Home, All }
 enum class Chip { All, Study }
 enum class InternalDestination { Home, Plan, Settings }
 
+/** Sub-page shown inside the Settings app. [Root] is the top-level settings list. */
+enum class SettingsPage { Root, Personalization, Icons, Theme, Wallpaper, Home, Clock }
+
 /** Lightweight, local-only study plan item.  Dates are ISO-8601 strings for stable persistence. */
 data class PlanTask(
     val id: String,
