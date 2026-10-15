@@ -3,6 +3,7 @@ package com.studentlauncher
 import android.app.ActivityOptions
 import android.app.Application
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -10,6 +11,7 @@ import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -31,7 +33,11 @@ import com.studentlauncher.reactions.TorchController
 import com.studentlauncher.reactions.TorchPatterns
 import com.studentlauncher.security.PinLock
 import com.studentlauncher.signals.Flip
+import com.studentlauncher.signals.NotificationMeta
+import com.studentlauncher.signals.SignalStore
 import com.studentlauncher.signals.SignalsMonitor
+import com.studentlauncher.signals.notificationAccessGranted
+import com.studentlauncher.signals.shouldReact
 import com.studentlauncher.ui.GlyphModes
 import com.studentlauncher.ui.PinMode
 import com.studentlauncher.ui.PinRequest
@@ -99,8 +105,42 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Called when the activity starts so the light is never left on across a resume. */
-    fun onActivityStart() = torch.beginSession()
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) = applyBattery(i)
+    }
+    private var batteryRegistered = false
+
+    /**
+     * Called when the activity starts: the light is never left on across a resume, and battery
+     * state starts tracking through the sticky broadcast (an event, not a poll).
+     */
+    fun onActivityStart() {
+        torch.beginSession()
+        if (!batteryRegistered) {
+            batteryRegistered = true
+            runCatching {
+                applyBattery(ctx.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
+            }
+        }
+    }
+
+    fun onActivityStop() {
+        torchOff()
+        if (batteryRegistered) {
+            batteryRegistered = false
+            runCatching { ctx.unregisterReceiver(batteryReceiver) }
+        }
+    }
+
+    private fun applyBattery(i: Intent?) {
+        if (i == null) return
+        val l = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val s = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (l >= 0 && s > 0) batteryPct = l * 100 / s
+        val st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        batteryCharging = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL
+        recomputeMatrixState()
+    }
 
     fun torchOff() = torch.allOff()
 
@@ -130,11 +170,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrDefault(true),
         batteryPct = batteryInfo().first,
         charging = batteryInfo().second,
-        quietNow = runCatching {
-            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
-        }.getOrDefault(false)
+        quietNow = quietNow()
     )
+
+    /** True while Do Not Disturb or a quiet profile is suppressing interruptions. */
+    private fun quietNow(): Boolean = runCatching {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
+    }.getOrDefault(false)
 
     private fun batteryInfo(): Pair<Int, Boolean> = runCatching {
         val i = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -150,24 +193,58 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         pct to charging
     }.getOrDefault(100 to false)
 
-    // ---- reactive matrix bursts ----
-    var reactionMode by mutableStateOf<String?>(null); private set
-    var reactionTick by mutableIntStateOf(0); private set
+    // ---- live glyph matrix state ----
+    /** Battery, kept live by a sticky BATTERY_CHANGED receiver while the activity is started. */
+    var batteryPct by mutableIntStateOf(100); private set
+    var batteryCharging by mutableStateOf(false); private set
+
+    /** What the glyph matrix shows right now; the widget renders this rather than a fixed mode. */
+    var matrixState by mutableStateOf(GlyphModes.CLOCK); private set
+    var matrixTick by mutableIntStateOf(0); private set
+
+    private var reactionMode: String? = null
+    private var lastNotifReactAt = 0L
 
     /**
-     * Plays a matrix reaction and, when opted in, the matching torch pattern. Only non-touch
-     * app events call this; touch, breathing and low-battery states never reach the torch.
+     * The ambient state the matrix falls back to when nothing is happening:
+     * charging > low battery > clock. All three render statically, so an idle matrix costs
+     * no frames at all.
+     */
+    private fun sustainedState(): String = when {
+        batteryCharging -> GlyphModes.CHARGING
+        batteryPct <= 15 -> GlyphModes.LOW
+        else -> GlyphModes.CLOCK
+    }
+
+    private fun pushMatrixState(next: String) {
+        if (next != matrixState) {
+            matrixState = next
+            matrixTick++
+        }
+    }
+
+    private fun recomputeMatrixState() = pushMatrixState(reactionMode ?: sustainedState())
+
+    /**
+     * Plays a matrix reaction and, when opted in, the matching torch pattern. Only non-touch app
+     * events call this; touch, breathing and low-battery states never reach the torch. After the
+     * burst the matrix settles back into the live state (charging, low battery or clock).
      */
     fun fireReaction(mode: String, torchPattern: List<Flash>? = null) {
         reactionMode = mode
-        reactionTick++
+        // Always bump the tick: two reactions of the same kind in a row must still replay.
+        matrixState = mode
+        matrixTick++
         if (torchPattern != null && torchEnabled) {
             torchNotice = torch.flash(torchPattern, torchConditions())
         }
+        val tick = matrixTick
         viewModelScope.launch {
-            val tick = reactionTick
-            delay(1800)
-            if (reactionTick == tick) reactionMode = null
+            delay(2200)
+            if (matrixTick == tick) {
+                reactionMode = null
+                recomputeMatrixState()
+            }
         }
     }
 
@@ -190,11 +267,21 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (v) signals.start() else signals.stop()
     }
 
-    fun startSignals() {
-        if (signalsEnabled) signals.start()
+    private val onNotification: (NotificationMeta) -> Unit = { meta ->
+        viewModelScope.launch { handleNotification(meta) }
     }
 
-    fun stopSignals() = signals.stop()
+    fun startSignals() {
+        if (signalsEnabled) signals.start()
+        if (notifSignalsEnabled) {
+            SignalStore.addListener(onNotification)
+        }
+    }
+
+    fun stopSignals() {
+        signals.stop()
+        SignalStore.removeListener(onNotification)
+    }
 
     /**
      * One accelerometer reading decides how a call is surfaced. Face up lights the matrix and
@@ -211,6 +298,61 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             Flip.Unknown -> Unit
         }
     }
+
+    // ---- Tier 1 signals: notification metadata only, opt-in, in-memory counts ----
+    var notifSignalsEnabled by mutableStateOf(prefs.getBoolean("notifSignalsEnabled", false)); private set
+    var signalNotice by mutableStateOf<String?>(null); private set
+    var notifAccess by mutableStateOf(false); private set
+
+    fun refreshNotifAccess() {
+        notifAccess = notificationAccessGranted(ctx)
+    }
+
+    fun applyNotifSignals(v: Boolean) {
+        notifSignalsEnabled = v
+        putB("notifSignalsEnabled", v)
+        refreshNotifAccess()
+        if (v) {
+            signalNotice = if (notifAccess) null else "Grant notification access below to start"
+            startSignals()
+        } else {
+            stopSignals()
+            signalNotice = null
+        }
+    }
+
+    fun openNotificationAccess() {
+        runCatching {
+            ctx.startActivity(
+                Intent("android.settings.NOTIFICATION_LISTENER_SETTINGS")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
+
+    /** (total since start, last hour) — metadata counts only, never content. */
+    fun signalCounts(): Pair<Int, Int> = SignalStore.counts(SystemClock.elapsedRealtime())
+
+    /**
+     * A notification arrived. Metadata only: the category, the group-summary flag and how loud
+     * the notification is decide the reaction. No title, body, sender, icon or extras is read.
+     */
+    private fun handleNotification(meta: NotificationMeta) {
+        if (!notifSignalsEnabled) return
+        if (quietNow()) return
+        val now = SystemClock.elapsedRealtime()
+        if (!shouldReact(lastNotifReactAt, now)) return
+        lastNotifReactAt = now
+        when {
+            // A bundled digest: a wide, calm sweep, never the torch.
+            meta.summary -> fireReaction(GlyphModes.WAVE, null)
+            // A loud notification: priority pulse, plus the torch pattern if opted in.
+            meta.important -> fireReaction(GlyphModes.PULSE, TorchPatterns.ALERT)
+            // Anything else: one quiet pulse.
+            else -> fireReaction(GlyphModes.TAP, null)
+        }
+    }
+
     var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
     var shuffleSlot by mutableStateOf(0); private set

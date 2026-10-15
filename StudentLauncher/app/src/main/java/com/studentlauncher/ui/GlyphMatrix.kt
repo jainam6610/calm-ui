@@ -178,10 +178,12 @@ fun reactionLevel(mode: String, x: Int, y: Int, t: Float, ctx: GlyphReaction): F
         GlyphModes.CHARGING -> {
             val bolt = BOLT_PARAM[idx]
             val ringR = (ctx.batteryPct / 100f) * 12.2f
-            val pulse = 0.55f + 0.45f * sin(t * Math.PI.toFloat() * 4f)
+            // While plugged in this is a sustained state, so once the intro burst has played
+            // (t >= 1) the ring and bolt render steady and cost no frames.
+            val ring = if (t >= 1f) 0.85f else 0.55f + 0.45f * sin(t * Math.PI.toFloat() * 4f)
             when {
                 bolt >= 0f -> 1f
-                abs(r - ringR) <= 0.75f -> pulse
+                abs(r - ringR) <= 0.75f -> ring
                 else -> 0.05f
             }
         }
@@ -219,26 +221,6 @@ internal fun timeCells(h: Int, m: Int): Set<Int> {
         }
     }
     return out
-}
-
-/** Battery percentage + charging flag, read once from the sticky broadcast (no polling). */
-@Composable
-fun rememberBattery(): Pair<Int, Boolean> {
-    val ctx = LocalContext.current
-    return remember {
-        val i = ctx.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-        var pct = 100
-        var charging = false
-        if (i != null) {
-            val l = i.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
-            val s = i.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)
-            if (l >= 0 && s > 0) pct = l * 100 / s
-            val st = i.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
-            charging = st == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
-                st == android.os.BatteryManager.BATTERY_STATUS_FULL
-        }
-        pct to charging
-    }
 }
 
 /**

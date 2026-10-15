@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -230,16 +231,44 @@ private fun SettingsRoot(vm: LauncherViewModel, requestNotifications: () -> Unit
             }
         }
 
-        SettingSection("Signals (calls)", if (!vm.signalsAvailable) "Needs Android 12+" else if (vm.signalsEnabled) "On" else "Off") {
+        SettingSection(
+            "Signals",
+            if (vm.signalsEnabled || vm.notifSignalsEnabled) "On" else "Off"
+        ) {
             Txt(
-                "When a call comes in, one accelerometer reading decides the reaction: face up shows a matrix pulse and never the torch; face down uses the torch (if enabled) and stays off the matrix; in a pocket does nothing. Calls are detected from the audio mode alone. The launcher never reads caller names, numbers, SMS, contacts or call logs, and nothing is stored.",
-                12f, c.fg2, maxLines = 8
+                "The glyph matrix follows your phone. It shows the clock, switches to the charging ring while plugged in, and reacts when a signal arrives.",
+                12f, c.fg2, maxLines = 4
             )
             Spacer(Modifier.height(10.dp))
-            if (!vm.signalsAvailable) {
-                Txt("Audio-mode call detection needs Android 12 or newer.", 12f, c.fg2, maxLines = 2)
-            } else {
+            if (vm.signalsAvailable) {
                 SwitchSetting("Call signals", "React when a call arrives", vm.signalsEnabled, vm::applySignalsEnabled)
+            } else {
+                Txt("Call signals need Android 12 or newer.", 12f, c.fg2, maxLines = 2)
+            }
+            Spacer(Modifier.height(10.dp))
+            SwitchSetting(
+                "Notification signals",
+                "Counts notifications only, never their content",
+                vm.notifSignalsEnabled,
+                vm::applyNotifSignals
+            )
+            LaunchedEffect(vm.notifSignalsEnabled) { vm.refreshNotifAccess() }
+            vm.signalNotice?.let {
+                Spacer(Modifier.height(6.dp))
+                Txt(it, 12f, c.fg2, maxLines = 2)
+            }
+            if (vm.notifSignalsEnabled && !vm.notifAccess) {
+                Spacer(Modifier.height(10.dp))
+                PillButton("Grant notification access", { vm.openNotificationAccess() })
+                Spacer(Modifier.height(6.dp))
+                PillButton("Check again", { vm.refreshNotifAccess() })
+            } else if (vm.notifSignalsEnabled) {
+                val counts = vm.signalCounts()
+                Spacer(Modifier.height(6.dp))
+                Txt(
+                    "Counting signals: ${counts.second} in the last hour, ${counts.first} in total. Held in memory only.",
+                    12f, c.fg2, maxLines = 2
+                )
             }
         }
 

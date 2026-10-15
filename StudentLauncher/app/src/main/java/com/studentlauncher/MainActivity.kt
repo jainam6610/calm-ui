@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        vm.torchOff()
+        vm.onActivityStop()
         vm.stopSignals()
         vm.hostMgr.stop()
         super.onStop()
@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        vm.torchOff()
+        vm.onActivityStop()
         runCatching { unregisterReceiver(pkgReceiver) }
         super.onDestroy()
     }

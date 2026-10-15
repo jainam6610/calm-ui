@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -105,6 +106,7 @@ import com.studentlauncher.mindful.ui.MindfulWeekContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
@@ -546,7 +548,7 @@ fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, c
             WT.CLOCK -> ClockContent(w, vm.clockStyle, fg, fg2, accent)
             WT.DATE -> DateContent(fg, fg2)
             WT.WEEK -> WeekContent(w, fg, fg2, accent)
-            WT.BATTERY -> BatteryContent(fg, accent)
+            WT.BATTERY -> BatteryContent(vm, fg, accent)
             WT.NEXT -> NextContent(w, fg, fg2)
             WT.COUNTDOWN -> CountdownContent(w, fg, fg2, accent)
             WT.TIMER -> TimerContent(w, vm, fg, fg2, accent)
@@ -976,23 +978,10 @@ private fun WeekContent(w: WidgetItem, fg: Color, fg2: Color, accent: Color) {
 }
 
 @Composable
-private fun BatteryContent(fg: Color, accent: Color) {
-    val ctx = LocalContext.current
-    var pct by remember { mutableIntStateOf(100) }
-    var charging by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            val i = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            if (i != null) {
-                val l = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val s = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-                if (l >= 0 && s > 0) pct = l * 100 / s
-                val st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                charging = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL
-            }
-            delay(30_000)
-        }
-    }
+private fun BatteryContent(vm: LauncherViewModel, fg: Color, accent: Color) {
+    // Driven by the ViewModel's sticky BATTERY_CHANGED receiver (an event, not a poll loop).
+    val pct = vm.batteryPct
+    val charging = vm.batteryCharging
     Box(Modifier.fillMaxWidth(0.8f).aspectRatio(1f), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val sw = 8.dp.toPx()
@@ -1327,14 +1316,21 @@ private fun QuickContent(fg: Color) {
 
 @Composable
 private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent: Color, compact: Boolean) {
-    val reaction = vm.reactionMode
-    val mode = reaction ?: w.get("mode", GlyphModes.CLOCK)
-    var burst by remember { mutableIntStateOf(0) }
-    val (batteryPct, charging) = rememberBattery()
+    val scope = rememberCoroutineScope()
+    // The widget is a live display: it renders whatever the launcher state says right now
+    // (notification reaction, charging, low battery, else the clock). Tap adds a ripple on the
+    // matrix only - touch never reaches the torch.
+    var peek by remember { mutableStateOf<String?>(null) }
+    var peekTick by remember { mutableIntStateOf(0) }
+    val mode = peek ?: vm.matrixState
     Box(
         Modifier.fillMaxWidth().tap {
-            burst++
-            vm.setCfg(w.id, "mode", GlyphModes.next(mode))
+            peek = GlyphModes.TAP
+            peekTick++
+            scope.launch {
+                delay(GlyphModes.durationMs(GlyphModes.TAP) + 120L)
+                peek = null
+            }
         },
         contentAlignment = Alignment.Center
     ) {
@@ -1343,9 +1339,9 @@ private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent
             fg,
             accent,
             Modifier.fillMaxWidth(if (compact) 0.55f else 0.62f).aspectRatio(1f),
-            burstKey = if (reaction != null) vm.reactionTick else burst,
-            batteryPct = batteryPct,
-            charging = charging
+            burstKey = if (peek != null) peekTick else vm.matrixTick,
+            batteryPct = vm.batteryPct,
+            charging = vm.batteryCharging
         )
     }
 }

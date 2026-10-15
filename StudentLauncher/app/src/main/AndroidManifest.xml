@@ -26,6 +26,9 @@
         <intent>
             <action android:name="android.settings.SETTINGS" />
         </intent>
+        <intent>
+            <action android:name="android.settings.NOTIFICATION_LISTENER_SETTINGS" />
+        </intent>
     </queries>
 
     <application
@@ -57,5 +60,22 @@
         <receiver
             android:name=".FocusReminderReceiver"
             android:exported="false" />
+
+        <!--
+            Tier 1 signals. Bound by the system only after the user grants notification access
+            in Settings, so it costs nothing until then. It reads notification metadata only
+            (package, category, post time, group-summary and importance flags) - never content.
+            The system holds BIND_NOTIFICATION_LISTENER_SERVICE, so the app requests no new
+            uses-permission.
+        -->
+        <service
+            android:name=".signals.SignalsListenerService"
+            android:exported="true"
+            android:label="@string/notification_signals"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

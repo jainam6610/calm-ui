@@ -51,7 +51,8 @@ Developed by thats.jainam.
     it — no accessibility, no usage access, no overlay and no special access.
   - Optional, off-by-default reactions: a finished focus session can play a short matrix animation,
     and (if you allow it) a brief camera-light flash with hard limits built in. Call signals use the
-    audio mode only and never read caller names, numbers, SMS, contacts or call logs.
+    audio mode only and never read caller names, numbers, SMS, contacts or call logs. Notification
+    signals count notifications from their metadata only — never their content.
 
   Private by design: no accounts, no ads, no tracking. Everything stays on your phone.
 

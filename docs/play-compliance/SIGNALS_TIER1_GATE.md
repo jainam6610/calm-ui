@@ -1,7 +1,8 @@
 # Signals — Tier 1 policy gate (NotificationListenerService)
 
-Status: **Not implemented.** Tier 0 shipped (`signals/SignalsTier0.kt`, commit `885d99b`).
-Tier 1 waits on the answers below and an explicit go-ahead from the developer.
+Status: **Implemented, off by default** (see "How it shipped" at the end). Tier 0 shipped first
+(`signals/SignalsTier0.kt`, commit `885d99b`); Tier 1 followed after the developer reviewed this
+gate and approved it.
 
 ## What Tier 1 would be
 
@@ -37,14 +38,28 @@ Tier 2 (caller names, SMS bodies, contacts, call log, `READ_PHONE_STATE`) remain
 
 ## Conclusion
 
-- **Do not build Tier 1 yet.** Two open items block it: (1) confirming whether Play requires a
-  sensitive-access declaration for notification access, and (2) the developer's decision that the
-  feature is worth the listing/Data-safety surface.
-- If it is approved, keep it strictly to the design: metadata only, in-memory counters, never any
-  content, same opt-in + plain-language notice pattern as the torch, and update the listing + Data
-  safety answers in the same change.
-- Regardless of the outcome, the app already ships the useful half (Tier 0 call signals) with **zero**
-  added permissions.
+- ~~**Do not build Tier 1 yet.**~~ The developer approved building it; see below.
+- The remaining open item is the Console check: **confirm whether Play requires a
+  sensitive-access declaration form for notification access** before submitting an update that
+  includes the listener.
+- Regardless, the shipped design keeps strictly to the plan: metadata only, in-memory counters,
+  never any content, opt-in with a plain-language notice, and no new `uses-permission`.
+
+## How it shipped
+
+- `signals/NotificationSignals.kt` — `NotificationMeta` has **no field** for a title, body,
+  extras, people or icons, so content cannot be captured even by mistake. `isCountableSignal`
+  drops the app's own notifications, ongoing work and service/progress/navigation/call noise.
+  `SignalTally` keeps counts in a rolling one-hour window, in memory only.
+- `signals/SignalsListenerService.kt` — reads package name, category, post time, the
+  group-summary flag and the ranking importance. Never `Notification.extras` or any content.
+- Opt-in switch in Settings with a grant-access button (the user must enable notification access
+  in system Settings; the launcher never auto-grants and cannot).
+- Reactions: a bundled digest plays a wide sweep, a loud (high-importance) notification plays the
+  priority pulse plus the torch pattern **only if torch reactions are also opted in**, anything
+  else plays one quiet pulse. A 2-second rate limiter keeps a chatty group chat from strobing.
+- Permission surface: unchanged. The manifest gains the bound `<service>` (the system holds
+  `BIND_NOTIFICATION_LISTENER_SERVICE`); the app still requests only `POST_NOTIFICATIONS`.
 
 > Note: `websearch` was unavailable during this session, so the policy wording above is cited by URL
 > and marked ❓ where it could not be quoted verbatim from a successful fetch.

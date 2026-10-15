@@ -246,10 +246,12 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                 Segmented(listOf("1" to "Monday", "0" to "Sunday"), w.get("mon", "1"), { vm.setCfg(id, "mon", it) })
             }
             WT.GLYPH -> {
-                SLabel("Pattern")
-                Segmented(
-                    listOf("Pulse" to "Pulse", "Spiral" to "Spiral", "Wave" to "Wave", "Time" to "Time"),
-                    w.get("mode", "Pulse"), { vm.setCfg(id, "mode", it) }
+                Txt(
+                    "This display follows your phone: it shows the clock, switches to the charging ring while plugged in, and reacts when a signal arrives.",
+                    12f,
+                    LocalColors.current.fg2,
+                    modifier = Modifier.padding(top = 14.dp),
+                    maxLines = 3
                 )
             }
             WT.QUOTES -> {

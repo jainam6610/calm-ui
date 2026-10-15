@@ -23,10 +23,10 @@ Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebu
   Clock (dot, digital, words, analog), date, week, battery, next up, exam countdown, study timer,
   tasks, quick settings, 3D sphere, glyph matrix, plus regular Android widgets.
   Each widget can use a Glass, Solid or None (no translucent cover) background, full or half width, and its own text colour.
-- Glyph matrix: on-screen 25 x 25 dot display (489 dots). Clock is static; Pulse, Spiral, Wave,
-  Breathe, Done, Charging, Tap and Low are short, event-driven bursts that end and then cost nothing
-  (no idle frame loop). It does not drive the physical Glyph Matrix on Nothing Phone (3), which needs
-  Nothing's own SDK.
+- Glyph matrix: a live 25 x 25 dot display (489 dots) that follows your phone. It shows the clock,
+  switches to a charging ring (with a bolt while plugged in) while plugged in, and plays a short
+  burst when a signal arrives — then settles and costs nothing (no idle frame loop). It does not
+  drive the physical Glyph Matrix on Nothing Phone (3), which needs Nothing's own SDK.
 - Icon packs: Original, Mono, Hairline, Bold, Dot, Bubble and Tile. Every pack is derived from the
   app's own themed (monochrome) layer when it ships one; apps without one keep their original icon.
 - Optional reactions, off by default: a finished focus session plays the Done reaction on the matrix,
@@ -37,6 +37,10 @@ Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebu
   mode only. A single accelerometer reading then picks face up (matrix pulse, never the torch) or face
   down (torch, if enabled, and nothing on the matrix). No caller name, number, SMS, contact or call
   log is ever read.
+- Notification signals, off by default: with notification access granted, the launcher counts
+  notifications from their **metadata only** — package, category, post time, group-summary and
+  importance flags. It never reads a title, body, sender, icon or extras, keeps counts in memory
+  only, and ignores its own notifications and background noise.
 - Side rail dock (vertical glass pill) as an alternative to the bottom dock.
 - Focus reminders every 5, 10 or 15 minutes while you are in a distracting app you opened from the launcher.
   Uses an inexact alarm and a notification. No accessibility, usage-access or overlay permission.
