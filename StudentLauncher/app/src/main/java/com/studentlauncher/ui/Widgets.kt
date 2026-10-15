@@ -126,7 +126,7 @@ import kotlin.random.Random
 // Dot-matrix helpers (Nothing style, drawn on canvas so no font is needed)
 // ---------------------------------------------------------------------------------------------
 
-private val GLYPHS: Map<Char, List<String>> = mapOf(
+internal val GLYPHS: Map<Char, List<String>> = mapOf(
     '0' to listOf("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
     '1' to listOf("00100", "01100", "00100", "00100", "00100", "00100", "01110"),
     '2' to listOf("01110", "10001", "00001", "00010", "00100", "01000", "11111"),
@@ -1325,76 +1325,28 @@ private fun QuickContent(fg: Color) {
     }
 }
 
-private val GLYPH_MODES = listOf("Pulse", "Spiral", "Wave", "Time")
-
 @Composable
 private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent: Color, compact: Boolean) {
-    val mode = w.get("mode", "Pulse")
+    val mode = w.get("mode", GlyphModes.CLOCK)
+    var burst by remember { mutableIntStateOf(0) }
+    val (batteryPct, charging) = rememberBattery()
     Box(
         Modifier.fillMaxWidth().tap {
-            vm.setCfg(w.id, "mode", GLYPH_MODES[(GLYPH_MODES.indexOf(mode) + 1).mod(GLYPH_MODES.size)])
+            burst++
+            vm.setCfg(w.id, "mode", GlyphModes.next(mode))
         },
         contentAlignment = Alignment.Center
     ) {
-        GlyphMatrix(mode, fg, accent, Modifier.fillMaxWidth(if (compact) 0.55f else 0.62f).aspectRatio(1f))
+        GlyphMatrix(
+            mode,
+            fg,
+            accent,
+            Modifier.fillMaxWidth(if (compact) 0.55f else 0.62f).aspectRatio(1f),
+            burstKey = burst,
+            batteryPct = batteryPct,
+            charging = charging
+        )
     }
-}
-
-/** On-screen 25 x 25 dot display inspired by Nothing's Glyph Matrix. */
-@Composable
-fun GlyphMatrix(mode: String, color: Color, accent: Color, modifier: Modifier) {
-    val now = rememberNow()
-    val is24 = DateFormat.is24HourFormat(LocalContext.current)
-    var t by remember { mutableFloatStateOf(0f) }
-    val motion = LocalMotionScale.current
-    // ponytail: Time mode never reads t — skip the frame loop entirely
-    LaunchedEffect(motion, mode) {
-        if (mode == "Time" || motion <= .05f) return@LaunchedEffect
-        var last = -1L
-        while (true) {
-            val n = withFrameNanos { it }
-            if (last >= 0) t += (n - last) / 1e9f * motion
-            last = n
-        }
-    }
-    val lit = remember(mode, now.hour, now.minute, is24) {
-        if (mode == "Time") timeCells(if (is24) now.hour else ((now.hour + 11) % 12) + 1, now.minute) else emptySet()
-    }
-    Canvas(modifier) {
-        val n = 25
-        val cell = size.width / n
-        val r = cell * 0.36f
-        for (y in 0 until n) for (x in 0 until n) {
-            val dx = x - 12f
-            val dy = y - 12f
-            val d = sqrt(dx * dx + dy * dy)
-            if (d > 12.6f) continue
-            val b = when (mode) {
-                "Spiral" -> (sin(atan2(dy, dx) * 2f + d * 0.7f - t * 3f) + 1f) / 2f
-                "Wave" -> (sin(x * 0.55f + t * 2.4f) + cos(y * 0.45f - t * 1.7f) + 2f) / 4f
-                "Time" -> if ((y * n + x) in lit) 1f else 0.08f
-                else -> { val v = (sin(d * 0.9f - t * 3.2f) + 1f) / 2f; v * v }
-            }.coerceIn(0f, 1f)
-            val centre = d < 1.2f
-            drawCircle(
-                color = if (centre) accent else color.copy(alpha = 0.10f + 0.9f * b),
-                radius = r,
-                center = Offset((x + 0.5f) * cell, (y + 0.5f) * cell)
-            )
-        }
-    }
-}
-
-private fun timeCells(h: Int, m: Int): Set<Int> {
-    val out = mutableSetOf<Int>()
-    val digits = listOf(h / 10, h % 10, m / 10, m % 10)
-    digits.forEachIndexed { i, dgt ->
-        val g = GLYPHS[('0' + dgt)] ?: return@forEachIndexed
-        val row0 = if (i < 2) 4 else 14
-        val col0 = 7 + (i % 2) * 6
-        for (r in g.indices) for (c in g[r].indices) if (g[r][c] == '1') out.add((row0 + r) * 25 + col0 + c)
-    }
-    return out
 }
 
 // ---------------------------------------------------------------------------------------------
