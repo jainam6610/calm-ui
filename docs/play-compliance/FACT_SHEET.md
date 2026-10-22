@@ -104,7 +104,7 @@ No `BIND_APPWIDGET`, no `INSTALL_SHORTCUT`, no privileged permission requested (
 
 | Source | Claims found (verbatim) |
 |---|---|
-| `docs/PLAY_STORE.md:23-51` | name "Student Launcher"; short desc "A calm, distraction-free launcher for students with widgets and focus tools."; full description incl. "Study mode **hides** the apps you mark as distracting", "A short pause before a distracting app opens", "The app never watches what you do and needs no special access", "Private by design: no accounts, no ads, no tracking. Everything stays on your phone." |
+| `docs/PLAY_STORE.md:23-58` | name "Student Launcher"; short desc "A calm, distraction-free launcher for students with widgets and focus tools."; full description incl. "Study mode **hides** the apps you mark as distracting", "A short pause before a distracting app opens", "An optional notification-access grant (special access, off by default) lets the launcher count notification metadata … never notification content", "Private by design: no accounts, no ads, no tracking. Everything stays on your phone." |
 | `docs/PLAY_STORE.md:53-58` | Data safety draft answers (see report — one needs rewording) |
 | `docs/PLAY_STORE.md:60-68` | IARC note, target-audience note "choose 13 and over…", policy URL |
 | `README.md:1-42` | "Student Launcher 3.0"; "no third-party libraries"; honest notes on the 489-cell glyph matrix, the seven icon packs, the optional torch reactions and the Tier 0 call signals ("No accessibility, usage-access or overlay permission"; the only permission is POST_NOTIFICATIONS) |
