@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,8 +14,10 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Bundle
 import android.os.PowerManager
 import android.os.SystemClock
+import android.util.SizeF
 import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
@@ -47,6 +50,7 @@ import com.studentlauncher.signals.SignalsMonitor
 import com.studentlauncher.signals.notificationAccessGranted
 import com.studentlauncher.signals.shouldReact
 import com.studentlauncher.ui.GlyphModes
+import com.studentlauncher.ui.rowSpanForFrameHeight
 import com.studentlauncher.ui.PinMode
 import com.studentlauncher.ui.PinRequest
 import com.studentlauncher.ui.WpAdjust
@@ -414,6 +418,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
     var widgetTargetHome by mutableStateOf(true)
     var pendingWidgetId = -1
+    private val hostedOptionSizes = mutableMapOf<String, Long>()
 
     // ---- widget delete undo: keep hosted ids alive until the window closes ----
     private val widgetUndo = UndoBuffer<WidgetItem>()
@@ -967,7 +972,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun commitAndroidWidget(appId: Int) {
-        activeWidgets().add(WidgetItem(UUID.randomUUID().toString(), WT.ANDROID, cfg = mapOf("appWidgetId" to appId.toString())))
+        val info = hostMgr.info(appId)
+        val rowSpan = info?.minHeight?.takeIf { it > 0 }?.let(::rowSpanForFrameHeight) ?: 2
+        activeWidgets().add(
+            WidgetItem(
+                id = UUID.randomUUID().toString(),
+                type = WT.ANDROID,
+                colSpan = WIDGET_COLUMNS,
+                rowSpan = rowSpan,
+                cfg = mapOf("appWidgetId" to appId.toString())
+            )
+        )
         saveActive()
         pendingWidgetId = -1
         widgetCenter = false
@@ -1117,6 +1132,30 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setWidgetColSpan(id: String, span: Int) {
         updateWidget(id) { it.copy(colSpan = clampWidgetColSpan(span)) }
+    }
+
+    /** Reports the composed size so hosted providers can pick their own layout. */
+    fun updateHostedWidgetOptions(id: String, widthDp: Int, heightDp: Int) {
+        if (widthDp <= 0 || heightDp <= 0) return
+        val w = findWidget(id) ?: return
+        if (w.type != WT.ANDROID) return
+        val appId = w.get("appWidgetId").toIntOrNull() ?: return
+        val sizeKey = (widthDp.toLong() shl 32) or (heightDp.toLong() and 0xFFFF_FFFFL)
+        if (hostedOptionSizes[id] == sizeKey) return
+        hostedOptionSizes[id] = sizeKey
+        val options = Bundle().apply {
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, widthDp)
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, widthDp)
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, heightDp)
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, heightDp)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                putParcelableArrayList(
+                    AppWidgetManager.OPTION_APPWIDGET_SIZES,
+                    arrayListOf(SizeF(widthDp.toFloat(), heightDp.toFloat()))
+                )
+            }
+        }
+        runCatching { hostMgr.mgr.updateAppWidgetOptions(appId, options) }
     }
 
     fun updateWidget(id: String, f: (WidgetItem) -> WidgetItem) {

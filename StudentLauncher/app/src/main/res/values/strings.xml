@@ -23,6 +23,7 @@
     <string name="app_alphabet">App alphabet</string>
     <string name="idle">Idle</string>
     <string name="resize_widget">Resize widget</string>
+    <string name="widget_settings">Widget settings</string>
     <string name="onboard_gesture_apps">Swipe up on the Apps handle, or tap it, for all apps.</string>
     <string name="onboard_gesture_rail">Drag the A-Z rail to jump to a letter.</string>
     <string name="onboard_gesture_widget">Long-press a widget to select it, then drag its corner to resize.</string>
