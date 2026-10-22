@@ -8,7 +8,12 @@ import org.junit.Test
 class BoardRowNeighborsTest {
 
     private fun w(id: String, half: Boolean, height: Int = 2) =
-        WidgetItem(id = id, type = "x", half = half, height = height)
+        WidgetItem(
+            id = id,
+            type = "x",
+            colSpan = if (half) 2 else 4,
+            rowSpan = height
+        )
 
     @Test fun pairsConsecutiveHalves() {
         val items = listOf(w("a", true), w("b", true), w("c", false), w("d", true), w("e", true))

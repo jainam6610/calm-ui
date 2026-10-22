@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.data.WIDGET_COLUMNS
 import com.studentlauncher.data.WT
 import com.studentlauncher.data.WidgetBg
 import java.time.LocalDate
@@ -123,7 +124,7 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
     // Pinned live preview rides the sheet top (skipped for hosted widgets — no cheap re-render).
     val header: (@Composable ColumnScope.() -> Unit)? = if (w.type == WT.ANDROID) null else {
         {
-            Box(Modifier.fillMaxWidth(if (w.half) 0.5f else 1f).padding(bottom = 14.dp)) {
+            Box(Modifier.fillMaxWidth(w.colSpan / WIDGET_COLUMNS.toFloat()).padding(bottom = 14.dp)) {
                 val fg = toneColor(w.tone, c)
                 WidgetContent(w, vm, fg, fg.copy(alpha = 0.6f), compact = true)
                 // The preview mirrors, it doesn't respond — consume the event chain at the
@@ -144,7 +145,10 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
 
         if (w.type == WT.ANDROID) {
             SLabel("Height")
-            Segmented(listOf(0 to "Small", 1 to "Medium", 2 to "Large"), w.size, { v -> vm.updateWidget(id) { it.copy(size = v) } })
+            Segmented(
+                listOf(1 to "Small", 2 to "Medium", 3 to "Tall", 4 to "Extra tall"),
+                w.rowSpan, { v -> vm.setWidgetRowSpan(id, v) }
+            )
         } else {
             SLabel("Background")
             Segmented(
@@ -152,9 +156,16 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                 w.bg, { v -> vm.updateWidget(id) { it.copy(bg = v) } }
             )
             SLabel("Height")
-            Segmented(listOf(1 to "Small", 2 to "Medium", 3 to "Tall"), w.height, { v -> vm.setWidgetHeight(id, v) })
+            Segmented(
+                listOf(1 to "Small", 2 to "Medium", 3 to "Tall", 4 to "Extra tall"),
+                w.rowSpan, { v -> vm.setWidgetRowSpan(id, v) }
+            )
             SLabel("Width")
-            Segmented(listOf(false to "Full", true to "Half"), w.half, { v -> vm.updateWidget(id) { it.copy(half = v) } })
+            Segmented(
+                listOf(WIDGET_COLUMNS to "Full", 2 to "Half"),
+                if (w.colSpan <= 2) 2 else WIDGET_COLUMNS,
+                { v -> vm.setWidgetColSpan(id, v) }
+            )
             SLabel("Text color")
             Segmented(
                 listOf("auto" to "Auto", "light" to "Light", "dark" to "Dark", "red" to "Red", "blue" to "Blue", "green" to "Green", "purple" to "Purple"),

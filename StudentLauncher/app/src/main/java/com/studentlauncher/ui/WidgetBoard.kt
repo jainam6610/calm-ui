@@ -26,8 +26,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.data.WIDGET_COLUMNS
 import com.studentlauncher.data.WT
 import com.studentlauncher.data.WidgetItem
+import com.studentlauncher.data.flowRows
+import com.studentlauncher.data.flowRowsOfSpans
+import com.studentlauncher.data.rowUsedColumns
 
 /**
  * Pure swap step for board drag. Returns (indexDelta, newOffset) when the dragged
@@ -56,21 +60,9 @@ internal fun boardSwap(
     return null
 }
 
-/** Row structure as flat indices — same pairing rules as buildRows. */
-internal fun boardRowIndexRows(items: List<WidgetItem>): List<List<Int>> {
-    val rows = mutableListOf<List<Int>>()
-    var i = 0
-    while (i < items.size) {
-        val a = items[i]
-        val b = items.getOrNull(i + 1)
-        if (a.effectiveHalf && b != null && b.effectiveHalf) {
-            rows.add(listOf(i, i + 1)); i += 2
-        } else {
-            rows.add(listOf(i)); i += 1
-        }
-    }
-    return rows
-}
+/** Row structure as flat indices — same span packing as the Home grid. */
+internal fun boardRowIndexRows(items: List<WidgetItem>): List<List<Int>> =
+    flowRowsOfSpans(items.map { it.colSpan })
 
 /** Vertical neighbors (flat indices) skipping horizontal pair partners. */
 internal fun boardVerticalNeighbors(items: List<WidgetItem>, idx: Int): Pair<Int?, Int?> {
@@ -125,7 +117,7 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
                 PillButton("Add your first widget", { vm.widgetTargetHome = false; vm.widgetCenter = true }, filled = true)
             }
         }
-        items(buildRows(vm.boardWidgets.toList()), key = { row -> row.joinToString { it.id } }) { row ->
+        items(flowRows(vm.boardWidgets.toList()), key = { row -> row.joinToString { it.id } }) { row ->
             Row(
                 Modifier.fillMaxWidth().animateItem(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -136,7 +128,7 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
                     val isDragging = dragId == item.id
                     Box(
                         Modifier
-                            .weight(1f)
+                            .weight(item.colSpan.toFloat())
                             .onSizeChanged { itemHeights[item.id] = it.height.toFloat() }
                     ) {
                         BoardWidget(
@@ -174,6 +166,10 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
                             onDragEnd = { dragId = null; dragOffset = 0f }
                         )
                     }
+                }
+                val used = rowUsedColumns(row)
+                if (used < WIDGET_COLUMNS) {
+                    Spacer(Modifier.weight((WIDGET_COLUMNS - used).toFloat()))
                 }
             }
         }

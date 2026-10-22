@@ -102,9 +102,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.studentlauncher.LauncherViewModel
 import com.studentlauncher.R
+import com.studentlauncher.data.MAX_WIDGET_ROW_SPAN
+import com.studentlauncher.data.WIDGET_COLUMNS
 import com.studentlauncher.data.WT
 import com.studentlauncher.data.WidgetBg
 import com.studentlauncher.data.WidgetItem
+import com.studentlauncher.data.flowRows
+import com.studentlauncher.data.rowUsedColumns
 import com.studentlauncher.mindful.ui.MindfulTodayContent
 import com.studentlauncher.mindful.ui.MindfulWeekContent
 import kotlinx.coroutines.Dispatchers
@@ -221,16 +225,8 @@ fun encodeTasks(l: List<Pair<Boolean, String>>): String =
 // Widget area
 // ---------------------------------------------------------------------------------------------
 
-internal fun buildRows(items: List<WidgetItem>): List<List<WidgetItem>> {
-    val rows = mutableListOf<List<WidgetItem>>()
-    var i = 0
-    while (i < items.size) {
-        val a = items[i]
-        val b = items.getOrNull(i + 1)
-        if (a.effectiveHalf && b != null && b.effectiveHalf) { rows.add(listOf(a, b)); i += 2 } else { rows.add(listOf(a)); i += 1 }
-    }
-    return rows
-}
+/** Rows are packed by colSpan, preserving item order. A lone half leaves a hole. */
+internal fun buildRows(items: List<WidgetItem>): List<List<WidgetItem>> = flowRows(items)
 
 @Composable
 private fun Appear(content: @Composable () -> Unit) {
@@ -276,7 +272,11 @@ fun Widgets(vm: LauncherViewModel, padStart: Dp, padEnd: Dp, compact: Boolean, m
                 key(row.joinToString { it.id }) {
                     Appear {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                            row.forEach { w -> Box(Modifier.weight(1f)) { WidgetBody(w, vm, compact) } }
+                            row.forEach { w -> Box(Modifier.weight(w.colSpan.toFloat())) { WidgetBody(w, vm, compact) } }
+                            val used = rowUsedColumns(row)
+                            if (used < WIDGET_COLUMNS) {
+                                Spacer(Modifier.weight((WIDGET_COLUMNS - used).toFloat()))
+                            }
                         }
                     }
                 }
@@ -326,7 +326,7 @@ private fun TodayContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: C
 }
 
 @Composable
-private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composable ColumnScope.(Color, Color) -> Unit) {
+private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, compact: Boolean, content: @Composable ColumnScope.(Color, Color) -> Unit) {
     val c = LocalColors.current
     val haptic = LocalHapticFeedback.current
     val fg = toneColor(w.tone, c)
@@ -375,6 +375,7 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                         }
                     )
                 }
+                .height(widgetFrameHeight(w.rowSpan, compact))
                 .padding(if (w.bg == WidgetBg.None) 6.dp else 12.dp)
         ) {
             Column { content(fg, fg2) }
@@ -423,18 +424,18 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                                     val cur = vm.findWidget(w.id) ?: break
                                     val steps = (accumV / stepPx).toInt()
                                     if (steps != markV) {
-                                        val newH = (cur.height + steps - markV).coerceIn(1, 3)
-                                        if (newH != cur.height) {
+                                        val newH = (cur.rowSpan + steps - markV).coerceIn(1, MAX_WIDGET_ROW_SPAN)
+                                        if (newH != cur.rowSpan) {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            vm.setWidgetHeight(w.id, newH)
+                                            vm.setWidgetRowSpan(w.id, newH)
                                         }
                                         markV = steps // advance even at the clamp, else drag-back never applies
                                     }
                                     if (abs(accumH) > flipPx) {
-                                        val want = accumH < 0f // drag left = half, right = full
-                                        if (want != cur.half) {
+                                        val want = if (accumH < 0f) 2 else WIDGET_COLUMNS // left = half, right = full
+                                        if (want != cur.colSpan) {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            vm.updateWidget(w.id) { it.copy(half = want) }
+                                            vm.updateWidget(w.id) { it.copy(colSpan = want) }
                                         }
                                     }
                                 }
@@ -533,22 +534,18 @@ fun ArrangeBar(vm: LauncherViewModel, onPage: Boolean, modifier: Modifier = Modi
 @Composable
 fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, compact: Boolean) {
     if (w.type == WT.ANDROID) {
-        HostedWidget(vm, w, Modifier.fillMaxWidth())
+        HostedWidget(vm, w, compact, Modifier.fillMaxWidth())
         return
     }
-    WidgetFrame(w, vm) { fg, fg2 -> WidgetContent(w, vm, fg, fg2, compact) }
+    WidgetFrame(w, vm, compact) { fg, fg2 -> WidgetContent(w, vm, fg, fg2, compact) }
 }
 
 /** Frame-free widget render — the frame adds gestures; the settings-sheet preview doesn't want them. */
 @Composable
 fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, compact: Boolean) {
     val accent = LocalColors.current.accent
-    // Height 1=80dp, 2=120dp, 3=180dp — controls max vertical space
-    val maxContentH = when (w.height) {
-        1 -> if (compact) 60.dp else 80.dp
-        3 -> if (compact) 140.dp else 180.dp
-        else -> if (compact) 90.dp else 120.dp
-    }
+    // Span 1..4 controls max vertical space; frame table lives in WidgetSpans.kt.
+    val maxContentH = widgetContentHeight(w.rowSpan, compact)
     Column(Modifier.heightIn(max = maxContentH)) {
         when (w.type) {
             WT.CLOCK -> ClockContent(w, vm.clockStyle, fg, fg2, accent)

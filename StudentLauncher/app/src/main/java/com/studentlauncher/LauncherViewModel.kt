@@ -1111,9 +1111,12 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         saveBoardWidgets()
     }
 
-    fun setWidgetHeight(id: String, h: Int) {
-        val clamped = h.coerceIn(1, 3)
-        updateWidget(id) { it.copy(height = clamped) }
+    fun setWidgetRowSpan(id: String, span: Int) {
+        updateWidget(id) { it.copy(rowSpan = clampWidgetRowSpan(span)) }
+    }
+
+    fun setWidgetColSpan(id: String, span: Int) {
+        updateWidget(id) { it.copy(colSpan = clampWidgetColSpan(span)) }
     }
 
     fun updateWidget(id: String, f: (WidgetItem) -> WidgetItem) {

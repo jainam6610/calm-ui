@@ -73,21 +73,94 @@ object WT {
         catalog.firstOrNull { it.first == type }?.second ?: if (type == ANDROID) "Android widget" else type
 }
 
+internal const val WIDGET_COLUMNS = 4
+internal const val MAX_WIDGET_ROW_SPAN = 4
+
+/** Width/height in grid spans. Order is position; there is no absolute row/column. */
 data class WidgetItem(
     val id: String,
     val type: String,
     val bg: WidgetBg = WidgetBg.Glass,
-    val half: Boolean = false,
+    val colSpan: Int = WIDGET_COLUMNS,
+    val rowSpan: Int = 2,
+    /** Legacy hosted-widget size, read only when old JSON has no rowSpan. */
     val size: Int = 1,
-    val height: Int = 2,
     val tone: String = "auto",
     val cfg: Map<String, String> = emptyMap()
 ) {
-    /** Explicit width flag — independent of height (small+full and tall+half both valid). */
-    val effectiveHalf: Boolean get() = half
     fun get(key: String, def: String = ""): String = cfg[key] ?: def
     fun put(key: String, value: String): WidgetItem = copy(cfg = cfg + (key to value))
 }
+
+/** One legacy record before spans are resolved. Explicit spans always win. */
+internal data class SpanSeed(
+    val explicitColSpan: Int?,
+    val explicitRowSpan: Int?,
+    val legacyHalf: Boolean,
+    val legacyHeight: Int
+)
+
+internal data class WidgetSpan(val colSpan: Int, val rowSpan: Int)
+
+internal fun clampWidgetColSpan(v: Int) = v.coerceIn(1, WIDGET_COLUMNS)
+internal fun clampWidgetRowSpan(v: Int) = v.coerceIn(1, MAX_WIDGET_ROW_SPAN)
+
+/**
+ * Legacy `half` was a flag, not a width: a lone half rendered full width because its
+ * row child used weight(1f). Preserve what users saw:
+ * - two consecutive legacy halves become 2 + 2 columns;
+ * - an unpaired legacy half becomes 4 columns;
+ * - a full widget stays 4 columns.
+ */
+internal fun migrateWidgetSpans(seeds: List<SpanSeed>): List<WidgetSpan> {
+    val out = ArrayList<WidgetSpan>(seeds.size)
+    var i = 0
+    while (i < seeds.size) {
+        val s = seeds[i]
+        val row = clampWidgetRowSpan(s.explicitRowSpan ?: s.legacyHeight)
+        if (s.explicitColSpan != null) {
+            out += WidgetSpan(clampWidgetColSpan(s.explicitColSpan), row)
+            i++
+            continue
+        }
+        val next = seeds.getOrNull(i + 1)
+        if (s.legacyHalf && next != null && next.explicitColSpan == null && next.legacyHalf) {
+            out += WidgetSpan(2, row)
+            out += WidgetSpan(2, clampWidgetRowSpan(next.explicitRowSpan ?: next.legacyHeight))
+            i += 2
+            continue
+        }
+        out += WidgetSpan(WIDGET_COLUMNS, row)
+        i++
+    }
+    return out
+}
+
+/** Row packing: consume spans left-to-right; a span that does not fit starts the next row. */
+internal fun flowRowsOfSpans(spans: List<Int>, columns: Int = WIDGET_COLUMNS): List<List<Int>> {
+    if (columns <= 0) return spans.indices.map { listOf(it) }
+    val rows = mutableListOf<List<Int>>()
+    var row = mutableListOf<Int>()
+    var used = 0
+    spans.forEachIndexed { index, raw ->
+        val span = raw.coerceIn(1, columns)
+        if (row.isNotEmpty() && used + span > columns) {
+            rows += row
+            row = mutableListOf()
+            used = 0
+        }
+        row += index
+        used += span
+    }
+    if (row.isNotEmpty()) rows += row
+    return rows
+}
+
+internal fun flowRows(items: List<WidgetItem>, columns: Int = WIDGET_COLUMNS): List<List<WidgetItem>> =
+    flowRowsOfSpans(items.map { it.colSpan }, columns).map { indices -> indices.map(items::get) }
+
+internal fun rowUsedColumns(row: List<WidgetItem>, columns: Int = WIDGET_COLUMNS): Int =
+    row.sumOf { it.colSpan.coerceIn(1, columns) }.coerceAtMost(columns)
 
 fun newWidget(type: String): WidgetItem {
     val h = when (type) {
@@ -98,8 +171,8 @@ fun newWidget(type: String): WidgetItem {
     return WidgetItem(
         id = UUID.randomUUID().toString(),
         type = type,
-        height = h,
-        half = h <= 1 || type in setOf(WT.WATER, WT.POMODORO),
+        rowSpan = h,
+        colSpan = if (h <= 1 || type in setOf(WT.WATER, WT.POMODORO)) 2 else WIDGET_COLUMNS,
         size = if (type in setOf(WT.PLANNER, WT.FLASHCARDS, WT.FORMULAS, WT.ASSIGNMENTS, WT.REMINDERS)) 1 else 0,
         cfg = when (type) {
             WT.CLOCK -> mapOf("style" to "Dot", "fmt" to "sys", "date" to "1", "quote" to "1")
@@ -131,7 +204,10 @@ fun List<WidgetItem>.toJson(): String {
         arr.put(
             JSONObject()
                 .put("id", w.id).put("type", w.type).put("bg", w.bg.name)
-                .put("half", w.half).put("size", w.size).put("height", w.height)
+                .put("colSpan", w.colSpan).put("rowSpan", w.rowSpan)
+                // One-release compatibility for older builds reading this JSON.
+                .put("half", w.colSpan <= 2).put("size", w.size)
+                .put("height", w.rowSpan.coerceIn(1, 3))
                 .put("tone", w.tone).put("cfg", cfg)
         )
     }
@@ -142,8 +218,25 @@ fun parseWidgets(s: String?): List<WidgetItem>? {
     if (s == null) return null
     return runCatching {
         val arr = JSONArray(s)
-        (0 until arr.length()).map { i ->
-            val o = arr.getJSONObject(i)
+        val objects = (0 until arr.length()).map { arr.getJSONObject(it) }
+        val seeds = objects.map { o ->
+            val half = o.optBoolean("half", false)
+            val type = o.optString("type")
+            // Old hosted widgets stored height in `size`, not in `height`.
+            val legacyHeight = if (type == WT.ANDROID) {
+                when (o.optInt("size", 1)) { 0 -> 1; 2 -> MAX_WIDGET_ROW_SPAN; else -> 2 }
+            } else {
+                o.optInt("height", if (half) 1 else 2)
+            }
+            SpanSeed(
+                explicitColSpan = if (o.has("colSpan")) o.optInt("colSpan") else null,
+                explicitRowSpan = if (o.has("rowSpan")) o.optInt("rowSpan") else null,
+                legacyHalf = half,
+                legacyHeight = legacyHeight
+            )
+        }
+        val spans = migrateWidgetSpans(seeds)
+        objects.mapIndexed { i, o ->
             val c = o.optJSONObject("cfg") ?: JSONObject()
             val cfg = mutableMapOf<String, String>()
             c.keys().forEach { k -> cfg[k] = c.optString(k) }
@@ -151,9 +244,9 @@ fun parseWidgets(s: String?): List<WidgetItem>? {
                 id = o.getString("id"),
                 type = o.getString("type"),
                 bg = runCatching { WidgetBg.valueOf(o.optString("bg", "Glass")) }.getOrDefault(WidgetBg.Glass),
-                half = o.optBoolean("half", false),
+                colSpan = spans[i].colSpan,
+                rowSpan = spans[i].rowSpan,
                 size = o.optInt("size", 1),
-                height = o.optInt("height", if (o.optBoolean("half", false)) 1 else 2),
                 tone = o.optString("tone", "auto"),
                 cfg = cfg
             )

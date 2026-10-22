@@ -23,15 +23,10 @@ import com.studentlauncher.data.WidgetItem
 
 /** A regular Android app widget (weather, calendar, ...) hosted inside a glass frame. */
 @Composable
-fun HostedWidget(vm: LauncherViewModel, item: WidgetItem, modifier: Modifier = Modifier) {
+fun HostedWidget(vm: LauncherViewModel, item: WidgetItem, compact: Boolean, modifier: Modifier = Modifier) {
     val appId = item.get("appWidgetId").toIntOrNull() ?: return
     val info = remember(appId) { vm.hostMgr.info(appId) } ?: return
-    val base = with(LocalDensity.current) { info.minHeight.toDp() }
-    val h = when (item.size) {
-        0 -> 110.dp
-        2 -> 260.dp
-        else -> base.coerceIn(140.dp, 200.dp)
-    }
+    val h = widgetFrameHeight(item.rowSpan, compact)
     Box(modifier.fillMaxWidth().height(h).glass(26.dp).clip(RoundedCornerShape(26.dp))) {
         AndroidView(
             factory = { c -> vm.hostMgr.host.createView(c, appId, info) },
