@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studentlauncher.data.*
@@ -814,14 +815,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         undoJob?.cancel()
         undoJob = null
         undoLabel = null
-        prefs.edit().remove("pending_widget_delete").apply()
+        prefs.edit { remove("pending_widget_delete") }
     }
 
     private fun finalizeWidgetUndo() {
         val entry = widgetUndo.takeExpired(System.currentTimeMillis()) ?: return
         releaseHosted(entry.item)
         undoLabel = null
-        prefs.edit().remove("pending_widget_delete").apply()
+        prefs.edit { remove("pending_widget_delete") }
     }
 
     /** Ends the undo window immediately (used when a newer delete arrives). */
@@ -832,7 +833,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         undoLabel = null
         undoJob?.cancel()
         undoJob = null
-        prefs.edit().remove("pending_widget_delete").apply()
+        prefs.edit { remove("pending_widget_delete") }
     }
 
     private fun releaseHosted(item: WidgetItem) {
@@ -856,7 +857,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val o = runCatching { JSONObject(raw) }.getOrNull()
         val item = o?.optString("item")?.let { parseWidgets(it)?.firstOrNull() }
         if (o == null || item == null) {
-            prefs.edit().remove("pending_widget_delete").apply()
+            prefs.edit { remove("pending_widget_delete") }
             return
         }
         val expires = o.optLong("expires", 0L)
@@ -864,7 +865,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val listKey = o.optString("list", "home")
         if (expires <= now) {
             releaseHosted(item)
-            prefs.edit().remove("pending_widget_delete").apply()
+            prefs.edit { remove("pending_widget_delete") }
             return
         }
         val entry = UndoEntry(item, o.optInt("index", 0), listKey, expires)
