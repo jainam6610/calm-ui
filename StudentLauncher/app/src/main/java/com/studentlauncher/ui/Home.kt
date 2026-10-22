@@ -71,8 +71,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -381,6 +383,16 @@ fun HomeLayer(
             exit = slideOutVertically(Motion.Offset) { -it } + fadeOut()
         ) { ToastPill(lastToast) }
 
+        AnimatedVisibility(
+            vm.undoLabel != null,
+            Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = if (vm.dockStyle == DockStyle.Bottom && vm.dock.isNotEmpty()) 96.dp else 56.dp),
+            enter = slideInVertically(Motion.Offset) { it } + fadeIn(),
+            exit = slideOutVertically(Motion.Offset) { it } + fadeOut()
+        ) { UndoPill(vm.undoLabel ?: "", vm::undoRemoveWidget) }
+
         if (homeMenu) {
             HomeMenuSheet(vm, onDismiss = { homeMenu = false })
         }
@@ -515,6 +527,21 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
             Txt("Apps", 10f, c.fg2, FontWeight.Medium)
             Txt("\u2191", 11f, c.fg2, FontWeight.Medium)
         }
+    }
+}
+
+@Composable
+private fun UndoPill(label: String, onUndo: () -> Unit) {
+    val c = LocalColors.current
+    Row(
+        Modifier.glass(24.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Txt("$label removed", 12f, c.fg)
+        Spacer(Modifier.width(8.dp))
+        PillButton("Undo", onUndo)
     }
 }
 

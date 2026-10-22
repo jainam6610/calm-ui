@@ -46,9 +46,11 @@ import com.studentlauncher.ui.Wallpapers
 import com.studentlauncher.ui.encodeTasks
 import com.studentlauncher.ui.parseTasks
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
@@ -395,6 +397,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var widgetTargetHome by mutableStateOf(true)
     var pendingWidgetId = -1
 
+    // ---- widget delete undo: keep hosted ids alive until the window closes ----
+    private val widgetUndo = UndoBuffer<WidgetItem>()
+    var undoLabel by mutableStateOf<String?>(null); private set
+    private var undoJob: Job? = null
+
     // ---- PIN (v4) ----
     val pin = PinLock(prefs)
     var pinSet by mutableStateOf(pin.isSet); private set
@@ -434,6 +441,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val planEvents = mutableStateListOf<PlanEvent>().apply { addAll(parsePlanEvents(prefs.getString("plan_events", "") ?: "")) }
 
     init {
+        restorePendingWidgetDelete()
         refresh()
         refreshMotionScale()
         refreshShuffleSlot()
@@ -761,13 +769,105 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeWidget(id: String) {
-        val w = homeWidgets.firstOrNull { it.id == id } ?: boardWidgets.firstOrNull { it.id == id } ?: return
-        val list = if (homeWidgets.contains(w)) homeWidgets else boardWidgets
-        if (w.type == WT.ANDROID) w.get("appWidgetId").toIntOrNull()?.let { hostMgr.release(it) }
-        list.remove(w)
+        val onHome = homeWidgets.indexOfFirst { it.id == id }
+        val onBoard = boardWidgets.indexOfFirst { it.id == id }
+        if (onHome < 0 && onBoard < 0) return
+        val isHome = onHome >= 0
+        val list = if (isHome) homeWidgets else boardWidgets
+        val index = if (isHome) onHome else onBoard
+        val w = list[index]
+
+        // A second delete supersedes the first; commit that one before staging this one.
+        commitPendingWidgetDelete()
+
+        list.removeAt(index)
         if (editWidgetId == id) editWidgetId = null
         if (selectedWidgetId == id) selectedWidgetId = null
-        if (list === homeWidgets) saveHomeWidgets() else saveBoardWidgets()
+        if (isHome) saveHomeWidgets() else saveBoardWidgets()
+
+        widgetUndo.stage(w, index, if (isHome) "home" else "board", System.currentTimeMillis())
+        undoLabel = WT.title(w.type)
+        persistPendingWidgetDelete()
+        undoJob?.cancel()
+        undoJob = viewModelScope.launch {
+            delay(5_200)
+            finalizeWidgetUndo()
+        }
+    }
+
+    /** Restores the last removed widget at its original index, if the window is still open. */
+    fun undoRemoveWidget() {
+        val entry = widgetUndo.undo(System.currentTimeMillis()) ?: run {
+            undoLabel = null
+            commitPendingWidgetDelete()
+            return
+        }
+        val list = if (entry.listKey == "home") homeWidgets else boardWidgets
+        list.add(entry.index.coerceIn(0, list.size), entry.item)
+        if (entry.listKey == "home") saveHomeWidgets() else saveBoardWidgets()
+        undoJob?.cancel()
+        undoJob = null
+        undoLabel = null
+        prefs.edit().remove("pending_widget_delete").apply()
+    }
+
+    private fun finalizeWidgetUndo() {
+        val entry = widgetUndo.takeExpired(System.currentTimeMillis()) ?: return
+        releaseHosted(entry.item)
+        undoLabel = null
+        prefs.edit().remove("pending_widget_delete").apply()
+    }
+
+    /** Ends the undo window immediately (used when a newer delete arrives). */
+    private fun commitPendingWidgetDelete() {
+        val entry = widgetUndo.pending ?: return
+        widgetUndo.clear()
+        releaseHosted(entry.item)
+        undoLabel = null
+        undoJob?.cancel()
+        undoJob = null
+        prefs.edit().remove("pending_widget_delete").apply()
+    }
+
+    private fun releaseHosted(item: WidgetItem) {
+        if (item.type != WT.ANDROID) return
+        item.get("appWidgetId").toIntOrNull()?.let { runCatching { hostMgr.release(it) } }
+    }
+
+    private fun persistPendingWidgetDelete() {
+        val entry = widgetUndo.pending ?: return
+        val o = JSONObject()
+            .put("item", listOf(entry.item).toJson())
+            .put("index", entry.index)
+            .put("list", entry.listKey)
+            .put("expires", entry.expiresAt)
+        putS("pending_widget_delete", o.toString())
+    }
+
+    /** A process kill during the undo window must not leak an Android widget host id. */
+    private fun restorePendingWidgetDelete() {
+        val raw = prefs.getString("pending_widget_delete", null) ?: return
+        val o = runCatching { JSONObject(raw) }.getOrNull()
+        val item = o?.optString("item")?.let { parseWidgets(it)?.firstOrNull() }
+        if (o == null || item == null) {
+            prefs.edit().remove("pending_widget_delete").apply()
+            return
+        }
+        val expires = o.optLong("expires", 0L)
+        val now = System.currentTimeMillis()
+        val listKey = o.optString("list", "home")
+        if (expires <= now) {
+            releaseHosted(item)
+            prefs.edit().remove("pending_widget_delete").apply()
+            return
+        }
+        val entry = UndoEntry(item, o.optInt("index", 0), listKey, expires)
+        widgetUndo.restore(entry)
+        undoLabel = WT.title(item.type)
+        undoJob = viewModelScope.launch {
+            delay((expires - System.currentTimeMillis()).coerceAtLeast(0L) + 200L)
+            finalizeWidgetUndo()
+        }
     }
 
     fun moveWidget(id: String, delta: Int) {
