@@ -251,17 +251,19 @@ fun ChoiceChip(
     modifier: Modifier = Modifier
 ) {
     val c = LocalColors.current
-    Box(modifier.height(48.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier.height(48.dp).selectable(
+            selected = selected,
+            role = Role.RadioButton,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick
+        ),
+        contentAlignment = Alignment.Center
+    ) {
         Box(
             Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp))
-                .background(if (selected) c.knob else c.track)
-                .selectable(
-                    selected = selected,
-                    role = Role.RadioButton,
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick
-                ),
+                .background(if (selected) c.knob else c.track),
             contentAlignment = Alignment.Center
         ) {
             Txt(label, 11f, if (selected) Color(0xFF1C1C1E) else c.fg, maxLines = 1)
