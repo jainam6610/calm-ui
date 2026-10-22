@@ -72,6 +72,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -280,6 +283,10 @@ fun AlphaScrubber(vm: LauncherViewModel, letterH: Dp, modifier: Modifier = Modif
     Column(
         modifier
             .width(48.dp)
+            .semantics {
+                contentDescription = "App alphabet"
+                stateDescription = if (active >= 0) LETTERS[active] else "Idle"
+            }
             .onSizeChanged { heightPx = it.height }
             .pointerInput(Unit) {
                 while (true) {

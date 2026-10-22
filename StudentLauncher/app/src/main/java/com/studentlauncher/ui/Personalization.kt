@@ -29,6 +29,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.studentlauncher.LauncherViewModel
@@ -168,7 +171,15 @@ internal fun ThemePage(vm: LauncherViewModel) {
                         row.forEach { id ->
                             val col = accentColor(id)
                             val on = vm.accentId == id
-                            Box(Modifier.size(48.dp).tap { vm.applyAccent(id) }, contentAlignment = Alignment.Center) {
+                            Box(
+                                Modifier.size(48.dp)
+                                    .semantics {
+                                        contentDescription = "Accent $id"
+                                        selected = on
+                                    }
+                                    .tap { vm.applyAccent(id) },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Box(
                                     Modifier.size(32.dp).clip(CircleShape).background(col)
                                         .border(if (on) 2.dp else 0.8.dp, if (on) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape)
@@ -198,16 +209,26 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 previews.forEach { (id, bmp) ->
                     val on = vm.wallpaper == id
-                    Box(Modifier.size(48.dp).tap { vm.applyWallpaper(id) }, contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.size(48.dp)
+                            .semantics { contentDescription = "Wallpaper $id"; selected = on }
+                            .tap { vm.applyWallpaper(id) },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Image(
-                            bmp, id, Modifier.size(34.dp).clip(CircleShape)
+                            bmp, null, Modifier.size(34.dp).clip(CircleShape)
                                 .border(if (on) 2.dp else 0.8.dp, if (on) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     }
                 }
                 val photo = vm.wallpaper == "photo"
-                Box(Modifier.size(48.dp).tap { pickPhoto() }, contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(48.dp)
+                        .semantics { contentDescription = "Custom photo"; selected = photo }
+                        .tap { pickPhoto() },
+                    contentAlignment = Alignment.Center
+                ) {
                     Box(
                         Modifier.size(34.dp).clip(CircleShape).background(c.track)
                             .border(if (photo) 2.dp else 0.8.dp, if (photo) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape),
@@ -215,7 +236,12 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
                     ) { Txt("+", 18f, c.fg) }
                 }
                 val shuffleOn = vm.wallpaper == "shuffle"
-                Box(Modifier.size(48.dp).tap { vm.applyWallpaper("shuffle") }, contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(48.dp)
+                        .semantics { contentDescription = "Shuffle photos"; selected = shuffleOn }
+                        .tap { vm.applyWallpaper("shuffle") },
+                    contentAlignment = Alignment.Center
+                ) {
                     Box(
                         Modifier.size(34.dp).clip(CircleShape).background(c.accent)
                             .border(if (shuffleOn) 2.dp else 0.8.dp, if (shuffleOn) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape),
@@ -231,10 +257,15 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
                     (0 until Wallpapers.MAX_SHUFFLE).forEach { i ->
                         val filled = i < vm.shuffleCount
                         Box(
-                            Modifier.size(48.dp).tap {
-                                if (filled) vm.removeShuffleSlot(i)
-                                else pickShufflePhotos()
-                            },
+                            Modifier.size(48.dp)
+                                .semantics {
+                                    contentDescription = "Wallpaper slot ${i + 1}"
+                                    selected = filled
+                                }
+                                .tap {
+                                    if (filled) vm.removeShuffleSlot(i)
+                                    else pickShufflePhotos()
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Box(

@@ -12,6 +12,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -217,12 +220,21 @@ fun <T> Segmented(
                 .height(28.dp)
                 .clip(RoundedCornerShape(8.dp)).background(c.knob)
         )
-        Row(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxSize().selectableGroup()) {
             options.forEach { (v, label) ->
-                Box(Modifier.weight(1f).fillMaxHeight().tap {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSelect(v)
-                }, contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.weight(1f).fillMaxHeight().selectable(
+                        selected = v == selected,
+                        role = Role.RadioButton,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelect(v)
+                        }
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
                     Txt(label, 12f, if (v == selected) Color(0xFF1C1C1E) else c.fg)
                 }
             }
@@ -243,7 +255,13 @@ fun ChoiceChip(
         Box(
             Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp))
                 .background(if (selected) c.knob else c.track)
-                .tap(onClick),
+                .selectable(
+                    selected = selected,
+                    role = Role.RadioButton,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                ),
             contentAlignment = Alignment.Center
         ) {
             Txt(label, 11f, if (selected) Color(0xFF1C1C1E) else c.fg, maxLines = 1)
@@ -258,10 +276,14 @@ fun GlassSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     val x by animateDpAsState(if (on) 20.dp else 2.dp, spring(dampingRatio = 0.7f, stiffness = 500f), label = "sw")
     val bg by animateColorAsState(if (on) c.fg else c.track, label = "swbg")
     // Invisible 48 dp touch box around the unchanged 44 x 26 visual.
-    Box(Modifier.size(48.dp).tap {
-        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        onChange(!on)
-    }, contentAlignment = Alignment.Center) {
+    Box(Modifier.size(48.dp).toggleable(
+        value = on,
+        role = Role.Switch,
+        onValueChange = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onChange(it)
+        }
+    ), contentAlignment = Alignment.Center) {
         Box(Modifier.width(44.dp).height(26.dp).clip(CircleShape).background(bg)) {
             Box(Modifier.offset(x = x, y = 2.dp).size(22.dp).clip(CircleShape).background(if (on) c.knobOn else c.knob))
         }

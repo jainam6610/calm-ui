@@ -55,6 +55,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -263,7 +266,10 @@ fun PauseSheet(vm: LauncherViewModel, app: AppInfo, onCancel: () -> Unit, onOpen
 @Composable
 fun ToastPill(text: String) {
     val c = LocalColors.current
-    Box(Modifier.glass(20.dp).padding(horizontal = 18.dp, vertical = 10.dp)) { Txt(text, 13f, c.fg) }
+    Box(
+        Modifier.glass(20.dp).semantics { liveRegion = LiveRegionMode.Polite }
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+    ) { Txt(text, 13f, c.fg) }
 }
 
 /** The tapped icon grows into a full-screen sheet (iPhone-style zoom), then collapses on return. */

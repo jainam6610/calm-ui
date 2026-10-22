@@ -87,6 +87,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -381,6 +383,7 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                         .align(Alignment.BottomEnd)
                         .padding(6.dp)
                         .size(48.dp)
+                        .semantics { contentDescription = "Resize widget" }
                         .pointerInput(w.id) { // w.id ONLY — a height/half key would cancel mid-drag
                             awaitEachGesture {
                                 var accumV = 0f
