@@ -370,7 +370,7 @@ fun AllAppsPanel(
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PillButton("Plan", { vm.destination = com.studentlauncher.data.InternalDestination.Plan }, Modifier.weight(1f))
-            PillButton("Detoxify", { vm.detoxSheetOpen = true }, Modifier.weight(1f))
+            PillButton("Detoxify", { vm.openDetoxSetup() }, Modifier.weight(1f))
             PillButton(stringResource(R.string.settings_gear), { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))

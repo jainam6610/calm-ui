@@ -32,6 +32,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studentlauncher.data.*
+import com.studentlauncher.detox.DetoxPage
 import com.studentlauncher.detox.DetoxPolicy
 import com.studentlauncher.detox.DetoxStore
 import com.studentlauncher.mindful.MindfulEngine
@@ -431,15 +432,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var protectStudy by mutableStateOf(pin.protectStudyMode); private set
     var pinRequest by mutableStateOf<PinRequest?>(null)
 
-    // ---- Detoxify (v6): a timed quiet home, allow-listed, PIN-gated on the way out ----
+    // ---- Detoxify (v6): a full Calm-style quiet mode, allow-listed, PIN-gated on the way out ----
     private val detoxStore = DetoxStore(prefs)
     var detox by mutableStateOf<DetoxPolicy.Session?>(detoxStore.load()); private set
     var detoxLeft by mutableStateOf(initialDetoxLeft()); private set
     /** Snapshot of the store value for UI; the store is authoritative. */
     var detoxReleaseAt by mutableStateOf(detoxStore.releaseAt); private set
-    var detoxSheetOpen by mutableStateOf(false)
     var detoxBlocked by mutableStateOf<String?>(null); private set
     var detoxSummary by mutableStateOf<DetoxPolicy.Summary?>(DetoxPolicy.decodeSummary(detoxStore.summary)); private set
+
+    /** Calm-style start flow, before a session exists: open flag, step, and the draft choices. */
+    var detoxSetup by mutableStateOf(false); private set
+    var detoxSetupStep by mutableStateOf(0); private set
+    var detoxDraftLen by mutableStateOf(DetoxPolicy.DAY_MS); private set
+    var detoxDraftAllowed by mutableStateOf<Set<String>>(emptySet()); private set
+    /** Page inside a running session. */
+    var detoxPage by mutableStateOf(DetoxPage.Home); private set
 
     private var detoxJob: Job? = null
     private var detoxBeat = 0
@@ -484,7 +492,37 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Starts a session. [selected] is what the user ticked on the start sheet. */
+    // ---- Calm-style start flow: length, apps, way out, ready ----
+
+    /** Opens the start flow; during a session it just returns to the quiet home. */
+    fun openDetoxSetup() {
+        if (detox != null) { detoxPage = DetoxPage.Home; return }
+        detoxSetup = true
+        detoxSetupStep = 0
+        detoxDraftLen = DetoxPolicy.DAY_MS
+        detoxDraftAllowed = emptySet()
+    }
+
+    fun closeDetoxSetup() { detoxSetup = false }
+
+    fun detoxStep(step: Int) { detoxSetupStep = step.coerceIn(0, DetoxPolicy.SETUP_STEPS - 1) }
+
+    fun detoxDraftDuration(ms: Long) { detoxDraftLen = ms }
+
+    fun detoxDraftToggle(pkg: String) {
+        if (pkg in detoxAlways) return
+        detoxDraftAllowed = if (pkg in detoxDraftAllowed) detoxDraftAllowed - pkg else detoxDraftAllowed + pkg
+    }
+
+    /** Starts from the last setup step. The PIN precondition is not optional. */
+    fun detoxBegin() {
+        if (!pinSet) { detoxSetupStep = 2; toast = "Set a PIN first"; return }
+        startDetox(detoxDraftLen, detoxDraftAllowed)
+    }
+
+    fun detoxSetPage(p: DetoxPage) { detoxPage = p }
+
+    /** Starts a session. [selected] is what the user ticked in the start flow. */
     fun startDetox(lengthMs: Long, selected: Set<String>) {
         if (detox != null) return
         val nowMono = SystemClock.elapsedRealtime()
@@ -497,7 +535,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         detoxBlocked = null
         detoxStore.summary = ""
         detoxSummary = null
-        detoxSheetOpen = false
+        detoxSetup = false
+        detoxPage = DetoxPage.Home
         goHome()
         toast = "Detoxify is on"
         ensureDetoxLoop()
@@ -541,6 +580,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         detoxLeft = 0L
         detoxReleaseAt = 0L
         detoxBlocked = null
+        detoxPage = DetoxPage.Home
+        detoxSetup = false
         detoxJob?.cancel()
         detoxJob = null
         detoxStore.clear()

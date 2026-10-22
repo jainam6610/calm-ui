@@ -57,11 +57,12 @@ Developed by thats.jainam.
     and (if you allow it) a brief camera-light flash with hard limits built in. Call signals use the
     audio mode only and never read caller names, numbers, SMS, contacts or call logs. Notification
     signals count notifications from their metadata only — never their content.
-  - Detoxify: a timed quiet mode (1 hour to 1 month) that hides every app you don't allow-list and
-    replaces the home screen with a plain countdown. Phone, camera and clock always work; ending
-    early takes your PIN and a 10-minute wait you can withdraw. No usage access, no accessibility:
-    blocking covers only what the launcher itself opens, and apps opened outside the launcher are
-    outside its reach.
+  - Detoxify: a timed quiet mode (1 hour to 1 month) in the style of a calm launcher. A short
+    four-step onboarding picks the length, the apps you allow and a PIN; the home screen then
+    becomes a plain countdown with lowercase app rows, always keeping phone, camera and clock.
+    Ending early takes your PIN and a 10-minute wait you can withdraw. No usage access, no
+    accessibility: blocking covers only what the launcher itself opens, and apps opened outside
+    the launcher are outside its reach.
 
   Private by design: no accounts, no ads, no tracking. Everything stays on your phone.
 

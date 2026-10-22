@@ -27,6 +27,9 @@ object DetoxPolicy {
     /** Early exit: right PIN first, then a ten-minute cooling-off the user can still cancel. */
     const val RELEASE_WAIT_MS: Long = 10 * 60_000L
 
+    /** Steps in the Calm-style start flow: length, apps, way out, ready. */
+    const val SETUP_STEPS: Int = 4
+
     /**
      * A running session. The pair of anchors keeps it reboot-proof: [startedWall]+[lengthMs] is
      * an absolute wall-clock deadline, and [savedMono]/[savedLeft] snapshot the remaining time on
