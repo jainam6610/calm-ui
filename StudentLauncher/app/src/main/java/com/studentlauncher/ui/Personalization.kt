@@ -126,13 +126,9 @@ internal fun IconsPage(vm: LauncherViewModel) {
             ICON_PACKS.chunked(3).forEach { row ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     row.forEach { p ->
-                        val on = p == vm.iconPack
-                        Box(
-                            Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp))
-                                .background(if (on) c.knob else c.track)
-                                .tap { vm.applyIconPack(p) },
-                            contentAlignment = Alignment.Center
-                        ) { Txt(p.name, 11f, if (on) Color(0xFF1C1C1E) else c.fg, maxLines = 1) }
+                        ChoiceChip(
+                            p.name, p == vm.iconPack, { vm.applyIconPack(p) }, Modifier.weight(1f)
+                        )
                     }
                     repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -166,15 +162,20 @@ internal fun ThemePage(vm: LauncherViewModel) {
             SwitchSetting("Wallpaper accent", "Picks accent colour from your wallpaper", vm.wpAccent, vm::applyWpAccent)
         }
         SettingSection("Accent") {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("red", "blue", "green", "purple", "orange", "teal", "pink").forEach { id ->
-                    val col = accentColor(id)
-                    val on = vm.accentId == id
-                    Box(
-                        Modifier.size(32.dp).clip(CircleShape).background(col)
-                            .border(if (on) 2.dp else 0.8.dp, if (on) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape)
-                            .tap { vm.applyAccent(id) }
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("red", "blue", "green", "purple", "orange", "teal", "pink").chunked(4).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { id ->
+                            val col = accentColor(id)
+                            val on = vm.accentId == id
+                            Box(Modifier.size(48.dp).tap { vm.applyAccent(id) }, contentAlignment = Alignment.Center) {
+                                Box(
+                                    Modifier.size(32.dp).clip(CircleShape).background(col)
+                                        .border(if (on) 2.dp else 0.8.dp, if (on) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -194,30 +195,33 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
             val previews = remember(c.dark) {
                 Wallpapers.presets.map { it to Wallpapers.preset(it, c.dark, 96, 96).asImageBitmap() }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 previews.forEach { (id, bmp) ->
                     val on = vm.wallpaper == id
-                    Image(
-                        bmp, id, Modifier.size(34.dp).clip(CircleShape)
-                            .border(if (on) 2.dp else 0.8.dp, if (on) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape)
-                            .tap { vm.applyWallpaper(id) },
-                        contentScale = ContentScale.Crop
-                    )
+                    Box(Modifier.size(48.dp).tap { vm.applyWallpaper(id) }, contentAlignment = Alignment.Center) {
+                        Image(
+                            bmp, id, Modifier.size(34.dp).clip(CircleShape)
+                                .border(if (on) 2.dp else 0.8.dp, if (on) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
                 val photo = vm.wallpaper == "photo"
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(c.track)
-                        .border(if (photo) 2.dp else 0.8.dp, if (photo) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape)
-                        .tap { pickPhoto() },
-                    contentAlignment = Alignment.Center
-                ) { Txt("+", 18f, c.fg) }
+                Box(Modifier.size(48.dp).tap { pickPhoto() }, contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.size(34.dp).clip(CircleShape).background(c.track)
+                            .border(if (photo) 2.dp else 0.8.dp, if (photo) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) { Txt("+", 18f, c.fg) }
+                }
                 val shuffleOn = vm.wallpaper == "shuffle"
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(c.accent)
-                        .border(if (shuffleOn) 2.dp else 0.8.dp, if (shuffleOn) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape)
-                        .tap { vm.applyWallpaper("shuffle") },
-                    contentAlignment = Alignment.Center
-                ) { Txt("S", 13f, Color.White, FontWeight.Bold) }
+                Box(Modifier.size(48.dp).tap { vm.applyWallpaper("shuffle") }, contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.size(34.dp).clip(CircleShape).background(c.accent)
+                            .border(if (shuffleOn) 2.dp else 0.8.dp, if (shuffleOn) c.fg else c.fg2.copy(alpha = 0.3f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) { Txt("S", 13f, Color.White, FontWeight.Bold) }
+                }
             }
             if (vm.wallpaper == "shuffle") {
                 Spacer(Modifier.height(10.dp))
@@ -227,16 +231,20 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
                     (0 until Wallpapers.MAX_SHUFFLE).forEach { i ->
                         val filled = i < vm.shuffleCount
                         Box(
-                            Modifier.size(44.dp).clip(CircleShape)
-                                .background(if (filled) c.track else c.track.copy(alpha = 0.4f))
-                                .border(if (i == vm.shuffleSlot && filled) 2.dp else 0.8.dp, if (i == vm.shuffleSlot && filled) c.accent else c.fg2.copy(alpha = 0.3f), CircleShape)
-                                .tap {
-                                    if (filled) vm.removeShuffleSlot(i)
-                                    else pickShufflePhotos()
-                                },
+                            Modifier.size(48.dp).tap {
+                                if (filled) vm.removeShuffleSlot(i)
+                                else pickShufflePhotos()
+                            },
                             contentAlignment = Alignment.Center
                         ) {
-                            Txt(if (filled) "\u00D7" else "+", 16f, if (filled) c.fg else c.fg2)
+                            Box(
+                                Modifier.size(44.dp).clip(CircleShape)
+                                    .background(if (filled) c.track else c.track.copy(alpha = 0.4f))
+                                    .border(if (i == vm.shuffleSlot && filled) 2.dp else 0.8.dp, if (i == vm.shuffleSlot && filled) c.accent else c.fg2.copy(alpha = 0.3f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Txt(if (filled) "\u00D7" else "+", 16f, if (filled) c.fg else c.fg2)
+                            }
                         }
                     }
                 }
@@ -300,13 +308,9 @@ internal fun ClockPage(vm: LauncherViewModel) {
             CLOCK_STYLES.chunked(3).forEach { row ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     row.forEach { s ->
-                        val on = s == vm.clockStyle
-                        Box(
-                            Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(8.dp))
-                                .background(if (on) c.knob else c.track)
-                                .tap { vm.applyClockStyle(s) },
-                            contentAlignment = Alignment.Center
-                        ) { Txt(s, 11f, if (on) Color(0xFF1C1C1E) else c.fg, maxLines = 1) }
+                        ChoiceChip(
+                            s, s == vm.clockStyle, { vm.applyClockStyle(s) }, Modifier.weight(1f)
+                        )
                     }
                     repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }

@@ -203,11 +203,20 @@ fun <T> Segmented(
     val haptic = LocalHapticFeedback.current
     val idx = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     val pos by animateFloatAsState(idx.toFloat(), Motion.Micro, label = "seg")
-    BoxWithConstraints(
-        modifier.fillMaxWidth().height(32.dp).clip(RoundedCornerShape(10.dp)).background(c.track).padding(2.dp)
-    ) {
+    // 48 dp touch target; the visible track stays 32 dp tall.
+    BoxWithConstraints(modifier.fillMaxWidth().height(48.dp)) {
         val segW = maxWidth / options.size
-        Box(Modifier.offset(x = segW * pos).width(segW).fillMaxHeight().clip(RoundedCornerShape(8.dp)).background(c.knob))
+        Box(
+            Modifier.align(Alignment.Center).fillMaxWidth().height(32.dp)
+                .clip(RoundedCornerShape(10.dp)).background(c.track)
+        )
+        Box(
+            Modifier.align(Alignment.CenterStart)
+                .offset(x = segW * pos + 2.dp)
+                .width((segW - 4.dp).coerceAtLeast(0.dp))
+                .height(28.dp)
+                .clip(RoundedCornerShape(8.dp)).background(c.knob)
+        )
         Row(Modifier.fillMaxSize()) {
             options.forEach { (v, label) ->
                 Box(Modifier.weight(1f).fillMaxHeight().tap {
@@ -221,17 +230,41 @@ fun <T> Segmented(
     }
 }
 
+/** A 34 dp visual chip inside a 48 dp touch target. */
+@Composable
+fun ChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val c = LocalColors.current
+    Box(modifier.height(48.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp))
+                .background(if (selected) c.knob else c.track)
+                .tap(onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Txt(label, 11f, if (selected) Color(0xFF1C1C1E) else c.fg, maxLines = 1)
+        }
+    }
+}
+
 @Composable
 fun GlassSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     val c = LocalColors.current
     val haptic = LocalHapticFeedback.current
     val x by animateDpAsState(if (on) 20.dp else 2.dp, spring(dampingRatio = 0.7f, stiffness = 500f), label = "sw")
     val bg by animateColorAsState(if (on) c.fg else c.track, label = "swbg")
-    Box(Modifier.width(44.dp).height(26.dp).clip(CircleShape).background(bg).tap {
+    // Invisible 48 dp touch box around the unchanged 44 x 26 visual.
+    Box(Modifier.size(48.dp).tap {
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         onChange(!on)
-    }) {
-        Box(Modifier.offset(x = x, y = 2.dp).size(22.dp).clip(CircleShape).background(if (on) c.knobOn else c.knob))
+    }, contentAlignment = Alignment.Center) {
+        Box(Modifier.width(44.dp).height(26.dp).clip(CircleShape).background(bg)) {
+            Box(Modifier.offset(x = x, y = 2.dp).size(22.dp).clip(CircleShape).background(if (on) c.knobOn else c.knob))
+        }
     }
 }
 
@@ -247,7 +280,7 @@ fun GlassSlider(
     val cb by rememberUpdatedState(onChange)
     val frac = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
     Box(
-        modifier.fillMaxWidth().height(32.dp).onSizeChanged { w = it.width }.pointerInput(range) {
+        modifier.fillMaxWidth().height(48.dp).onSizeChanged { w = it.width }.pointerInput(range) {
             while (true) {
                 awaitEachGesture {
                     val d = awaitFirstDown(requireUnconsumed = false)

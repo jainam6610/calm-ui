@@ -380,7 +380,7 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                     Modifier
                         .align(Alignment.BottomEnd)
                         .padding(6.dp)
-                        .size(44.dp)
+                        .size(48.dp)
                         .pointerInput(w.id) { // w.id ONLY — a height/half key would cancel mid-drag
                             awaitEachGesture {
                                 var accumV = 0f

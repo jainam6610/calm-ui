@@ -279,7 +279,7 @@ fun AlphaScrubber(vm: LauncherViewModel, letterH: Dp, modifier: Modifier = Modif
 
     Column(
         modifier
-            .width(30.dp)
+            .width(48.dp)
             .onSizeChanged { heightPx = it.height }
             .pointerInput(Unit) {
                 while (true) {
@@ -320,7 +320,7 @@ fun AlphaScrubber(vm: LauncherViewModel, letterH: Dp, modifier: Modifier = Modif
             )
             val dim = idx in 1..26 && ('A' + (idx - 1)) !in available
             Box(
-                Modifier.height(letterH).width(30.dp).graphicsLayer {
+                Modifier.height(letterH).width(48.dp).graphicsLayer {
                     translationX = (if (right) -off.value else off.value) * density
                     scaleX = sc.value; scaleY = sc.value
                 },

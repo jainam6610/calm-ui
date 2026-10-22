@@ -167,7 +167,7 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
 private fun CtxItem(label: String, onClick: () -> Unit) {
     val haptic = LocalHapticFeedback.current
     Box(
-        Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(14.dp)).tap {
+        Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(14.dp)).tap {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         }.padding(horizontal = 12.dp),

@@ -585,10 +585,10 @@ private fun HomePageContent(
         val rail = vm.dockStyle == DockStyle.Rail
         val railLeft = rail && side != AlphaSide.Left
         val railRight = rail && side == AlphaSide.Left
-        val startPad = 22.dp + (if (side == AlphaSide.Left) 20.dp else 0.dp) + (if (railLeft) 66.dp else 0.dp)
-        val endPad = 22.dp + (if (side == AlphaSide.Right) 20.dp else 0.dp) + (if (railRight) 66.dp else 0.dp)
-        val wStart = 16.dp + (if (side == AlphaSide.Left) 26.dp else 0.dp) + (if (railLeft) 66.dp else 0.dp)
-        val wEnd = 16.dp + (if (side == AlphaSide.Right) 26.dp else 0.dp) + (if (railRight) 66.dp else 0.dp)
+        val startPad = 22.dp + (if (side == AlphaSide.Left) 38.dp else 0.dp) + (if (railLeft) 66.dp else 0.dp)
+        val endPad = 22.dp + (if (side == AlphaSide.Right) 38.dp else 0.dp) + (if (railRight) 66.dp else 0.dp)
+        val wStart = 16.dp + (if (side == AlphaSide.Left) 42.dp else 0.dp) + (if (railLeft) 66.dp else 0.dp)
+        val wEnd = 16.dp + (if (side == AlphaSide.Right) 42.dp else 0.dp) + (if (railRight) 66.dp else 0.dp)
 
         if (showHome) {
             Column(
