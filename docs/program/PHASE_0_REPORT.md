@@ -3,9 +3,9 @@
 Date: 2026-10-22  
 Baseline: `fcec642` (Phase R report committed at `e9c9e96`)  
 Phase 0 code head: `348eb5a`  
-Current repository HEAD at report time: `abe81f3`
+Measured code commit: `eacd089`
 
-> Two later **Detox** commits (`2ca2ee0`, `abe81f3`) landed after Phase 0. They are outside this phase but are included in the HEAD measurements below. Uncommitted working-tree changes are **not** included.
+> Three later **Detox** commits (`2ca2ee0`, `abe81f3`, `eacd089`) landed after Phase 0. They are outside this phase but are included in the measured commit below. Uncommitted working-tree changes are **not** included.
 
 ## Completed items
 
@@ -27,21 +27,21 @@ Phase 0 adds 17 unit tests (98 → 115). Later Detox tests bring HEAD to 128.
 
 ## Gate evidence
 
-Run in a detached clean worktree at `abe81f3` so unrelated uncommitted edits could not affect the result:
+Run in a detached clean worktree so unrelated uncommitted edits could not affect the result. The worktree was first gated at `abe81f3`, then checked out to `eacd089` and the full command was rerun:
 
 ```text
 .\gradlew testDebugUnitTest lintDebug assembleDebug bundleRelease
-BUILD SUCCESSFUL in 13m 10s
+BUILD SUCCESSFUL in 6m 57s
 ```
 
-| Measurement | Baseline `fcec642` | Current HEAD `abe81f3` |
+| Measurement | Baseline `fcec642` | Measured `eacd089` |
 |---|---|---|
 | Unit tests | 98 passed | **128 passed, 0 failed** |
 | Lint | 0 errors / 63 warnings | **0 errors / 66 warnings** |
-| AAB size | 4,124,133 bytes (3.93 MiB) | **4,181,591 bytes (3.99 MiB)** |
-| AAB SHA-256 | `9E3994C09F1A464E5BC3F27FF7D7D8B1B6DEA3A57F314C4000B55FF14ACCEAD3` | `AC465DAD9DDA092B929C71E768D062EE0B0A26920198F9B630995A7C612AA524` |
+| AAB size | 4,124,133 bytes (3.93 MiB) | **4,183,522 bytes (3.99 MiB)** |
+| AAB SHA-256 | `9E3994C09F1A464E5BC3F27FF7D7D8B1B6DEA3A57F314C4000B55FF14ACCEAD3` | `7D779C561EC20C396EEF47B1494833CF04DA2D3067D9B8E01EE83203295AD01D` |
 
-AAB delta: **+57,458 bytes (+1.39%)**, including the two later Detox commits. Phase 0 alone measured 0 errors / 62 warnings after the string move. The four extra HEAD warnings are `UseKtx` suggestions in the later Detox code.
+AAB delta: **+59,389 bytes (+1.44%)**, including the three later Detox commits. Phase 0 alone measured 0 errors / 62 warnings after the string move. The four extra measured warnings are `UseKtx` suggestions in the later Detox code.
 
 Manifest: `git diff fcec642..HEAD -- StudentLauncher/app/src/main/AndroidManifest.xml` is empty. Merged release manifest still contains only:
 
