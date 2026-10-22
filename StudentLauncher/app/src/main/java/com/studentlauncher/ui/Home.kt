@@ -388,7 +388,7 @@ fun HomeLayer(
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = if (vm.dockStyle == DockStyle.Bottom && vm.dock.isNotEmpty()) 96.dp else 56.dp),
+                .padding(bottom = if (vm.dockStyle == DockStyle.Bottom && vm.dock.isNotEmpty()) 138.dp else 68.dp),
             enter = slideInVertically(Motion.Offset) { it } + fadeIn(),
             exit = slideOutVertically(Motion.Offset) { it } + fadeOut()
         ) { UndoPill(vm.undoLabel ?: "", vm::undoRemoveWidget) }

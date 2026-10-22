@@ -797,9 +797,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Restores the last removed widget at its original index, if the window is still open. */
     fun undoRemoveWidget() {
+        // Capture before undo(): an expired entry is dropped by undo() and still needs its
+        // hosted id released, otherwise the delete window would leak the AppWidgetHost id.
+        val pendingBefore = widgetUndo.pending
         val entry = widgetUndo.undo(System.currentTimeMillis()) ?: run {
+            if (pendingBefore != null) {
+                widgetUndo.restore(pendingBefore)
+                commitPendingWidgetDelete()
+            }
             undoLabel = null
-            commitPendingWidgetDelete()
             return
         }
         val list = if (entry.listKey == "home") homeWidgets else boardWidgets
