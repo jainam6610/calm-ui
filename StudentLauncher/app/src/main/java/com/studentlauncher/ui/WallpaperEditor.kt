@@ -83,7 +83,7 @@ fun WallpaperEditor(vm: LauncherViewModel) {
                             }
                         }
                     },
-                contentScale = ContentScale.FillBounds
+                contentScale = ContentScale.Crop
             )
         }
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = dim }.background(Color.Black))

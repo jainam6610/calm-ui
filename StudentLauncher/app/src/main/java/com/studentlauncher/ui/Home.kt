@@ -155,7 +155,7 @@ fun LauncherRoot(
             set?.let { s ->
                 val motion = LocalMotionScale.current
                 Crossfade(s, animationSpec = tween((700 * motion).coerceAtLeast(1f).toInt()), label = "wallpaper") { cur ->
-                    Image(cur.full, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
+                    Image(cur.full, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }
             }
             when {
