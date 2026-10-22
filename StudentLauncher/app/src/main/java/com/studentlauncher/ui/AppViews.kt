@@ -359,7 +359,7 @@ fun AllAppsPanel(
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PillButton("Plan", { vm.destination = com.studentlauncher.data.InternalDestination.Plan }, Modifier.weight(1f))
-            PillButton("Settings", { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
+            PillButton("\u2699 Settings", { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Segmented(listOf(Chip.All to "All", Chip.Study to "Study"), vm.chip, { vm.chip = it }, Modifier.width(170.dp))
