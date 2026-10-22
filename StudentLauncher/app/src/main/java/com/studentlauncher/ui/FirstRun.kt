@@ -48,6 +48,7 @@ import com.studentlauncher.data.InternalDestination
 import com.studentlauncher.data.IconShape
 import com.studentlauncher.data.SettingsPage
 import com.studentlauncher.data.ThemeMode
+import com.studentlauncher.detox.DetoxPolicy
 
 
 @Composable
@@ -216,6 +217,40 @@ private fun SettingsRoot(vm: LauncherViewModel, requestNotifications: () -> Unit
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PillButton("Change PIN", { vm.requestChangePin() }, Modifier.weight(1f))
                     PillButton("Remove PIN", { vm.requestRemovePin() }, Modifier.weight(1f))
+                }
+            }
+        }
+
+        SettingSection(
+            "Detoxify",
+            when {
+                vm.detox == null -> "Off"
+                vm.detoxReleaseAt != 0L -> "ending"
+                else -> DetoxPolicy.label(vm.detoxLeft)
+            }
+        ) {
+            if (vm.detox == null) {
+                Txt(
+                    "A timed quiet home: 1 hour to 1 month. Everything you don't tick " +
+                        "disappears until the timer ends; phone, camera and clock always stay.",
+                    12f, c.fg2, maxLines = 3
+                )
+                Spacer(Modifier.height(8.dp))
+                PillButton("Start a session", { vm.detoxSheetOpen = true })
+            } else {
+                Txt(
+                    "The session runs until the timer runs out. Everything not on the " +
+                        "allow-list stays hidden until then.",
+                    12f, c.fg2, maxLines = 3
+                )
+                Spacer(Modifier.height(8.dp))
+                if (vm.detoxReleaseAt != 0L) {
+                    val left = DetoxPolicy.releaseLeftMs(vm.detoxReleaseAt, System.currentTimeMillis())
+                    Txt("Ending in ${DetoxPolicy.label(left)}. You can still withdraw.", 12f, c.accent, maxLines = 2)
+                    Spacer(Modifier.height(6.dp))
+                    PillButton("Withdraw the exit", { vm.cancelDetoxRelease() })
+                } else {
+                    PillButton("End session early", { vm.requestDetoxEnd() })
                 }
             }
         }

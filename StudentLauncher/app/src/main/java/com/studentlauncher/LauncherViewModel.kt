@@ -553,6 +553,34 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         detoxStore.summary = ""
     }
 
+    // ---- Detoxify early exit: right PIN, then a 10-minute cooling-off ----
+
+    /** Opens the PIN pad (create if the PIN was removed mid-session), then starts the wait. */
+    fun requestDetoxEnd() {
+        if (detox == null) return
+        if (detoxReleaseAt != 0L) { toast = "The exit wait is already running"; return }
+        if (pinSet) {
+            pinRequest = PinRequest("Enter your PIN", PinMode.Verify) { beginDetoxRelease() }
+        } else {
+            pinRequest = PinRequest("Set a PIN to end early", PinMode.Create) { beginDetoxRelease() }
+        }
+    }
+
+    private fun beginDetoxRelease() {
+        if (detox == null) return
+        val at = System.currentTimeMillis() + DetoxPolicy.RELEASE_WAIT_MS
+        detoxReleaseAt = at
+        detoxStore.releaseAt = at
+        toast = "Detoxify ends in 10 minutes"
+    }
+
+    /** Withdraw the pending exit — the safe direction, so no PIN for cancelling. */
+    fun cancelDetoxRelease() {
+        detoxReleaseAt = 0L
+        detoxStore.releaseAt = 0L
+        toast = "Withdrawn — the session keeps running"
+    }
+
     /** A quiet "back to normal" nudge; the notification permission is respected by wrapping. */
     private fun notifyDetoxDone(summary: DetoxPolicy.Summary) {
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return

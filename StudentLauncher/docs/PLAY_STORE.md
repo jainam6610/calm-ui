@@ -6,6 +6,8 @@ Developed by thats.jainam.
 - targetSdk 36 / compileSdk 36. Google Play requires new apps and updates to target Android 16 (API 36) from August 31, 2026.
 - Release builds use R8 shrinking and resource shrinking, and build an Android App Bundle (AAB).
 - No AccessibilityService, usage-access, overlay (SYSTEM_ALERT_WINDOW), exact-alarm or QUERY_ALL_PACKAGES permission.
+  Detoxify blocking is launcher-side only (launches through the launcher);
+  it adds no permissions and does not claim to police Recents or notification taps.
 - POST_NOTIFICATIONS is the only runtime permission. It is requested when the user turns on focus reminders. An optional notification-listener service can be enabled through Android's notification-access special access; it is off by default and reads metadata only (see Focus tools below).
 - allowBackup is off and data-extraction rules exclude all app data, so nothing is copied to
   cloud backup or device-to-device transfer.
@@ -55,6 +57,11 @@ Developed by thats.jainam.
     and (if you allow it) a brief camera-light flash with hard limits built in. Call signals use the
     audio mode only and never read caller names, numbers, SMS, contacts or call logs. Notification
     signals count notifications from their metadata only — never their content.
+  - Detoxify: a timed quiet mode (1 hour to 1 month) that hides every app you don't allow-list and
+    replaces the home screen with a plain countdown. Phone, camera and clock always work; ending
+    early takes your PIN and a 10-minute wait you can withdraw. No usage access, no accessibility:
+    blocking covers only what the launcher itself opens, and apps opened outside the launcher are
+    outside its reach.
 
   Private by design: no accounts, no ads, no tracking. Everything stays on your phone.
 

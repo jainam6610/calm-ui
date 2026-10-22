@@ -68,7 +68,12 @@ fun DetoxHome(vm: LauncherViewModel) {
         )
         if (vm.detoxReleaseAt != 0L) {
             Spacer(Modifier.height(12.dp))
-            Txt("ending early — wait is running", 12f, c.accent, maxLines = 2)
+            val rl = DetoxPolicy.releaseLeftMs(vm.detoxReleaseAt, System.currentTimeMillis())
+            Txt("ends early in ${DetoxPolicy.label(rl)}", 12f, c.accent)
+            Txt(
+                "withdraw", 12f, c.fg2,
+                modifier = Modifier.tap { vm.cancelDetoxRelease() }.padding(top = 2.dp)
+            )
         }
         Spacer(Modifier.height(28.dp))
 

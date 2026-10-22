@@ -14,6 +14,7 @@ Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebu
 ## Quiet Motion redesign
 - First-run onboarding is a five-step, skippable flow that ends by teaching the Apps handle, A-Z rail, widget resize, and Widget Board gestures. It only requests notification permission when the student explicitly chooses focus reminders; the flow can be restarted in Settings.
 - **Plan** is a first-party internal app, reached from Home. Tasks store title, course, ISO due date, priority, and completion locally in launcher preferences. No account or network is involved.
+- **Detoxify** is a timed quiet mode (1 hour, 1 day, 1 week or 30 days): the home screen becomes a plain countdown with lowercase rows for just the apps the user allow-listed. Phone, camera and clock always work; everything else hides until the timer ends. Ending early takes the PIN plus a 10-minute wait (withdrawable), and the session survives reboots and clock changes. No new permissions — blocking covers only what the launcher itself can reach.
 - Home uses a single widget language (12dp corners, neutral outlines, restrained red signal state). Widget placement uses Compose layout animation and the home canvas uses spring/fade-through motion; motion intensity and visual density are configurable in Settings.
 - Settings is an ordinary internal launcher destination rather than a persistent menu bar. Existing wallpaper, app, widget, and focus controls remain available.
 
