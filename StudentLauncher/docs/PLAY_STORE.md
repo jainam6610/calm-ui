@@ -6,7 +6,7 @@ Developed by thats.jainam.
 - targetSdk 36 / compileSdk 36. Google Play requires new apps and updates to target Android 16 (API 36) from August 31, 2026.
 - Release builds use R8 shrinking and resource shrinking, and build an Android App Bundle (AAB).
 - No AccessibilityService, usage-access, overlay (SYSTEM_ALERT_WINDOW), exact-alarm or QUERY_ALL_PACKAGES permission.
-- The only permission is POST_NOTIFICATIONS, requested when the user turns on focus reminders.
+- POST_NOTIFICATIONS is the only runtime permission. It is requested when the user turns on focus reminders. An optional notification-listener service can be enabled through Android's notification-access special access; it is off by default and reads metadata only (see Focus tools below).
 - allowBackup is off and data-extraction rules exclude all app data, so nothing is copied to
   cloud backup or device-to-device transfer.
 - Predictive back is enabled and the UI is edge-to-edge (both are required behaviour on API 36).
@@ -48,7 +48,9 @@ Developed by thats.jainam.
   - A short pause before a distracting app opens.
   - Optional reminders every 5, 10 or 15 minutes while you are in a distracting app.
     Reminders are plain notifications. The app only counts the time of apps you open from
-    it — no accessibility, no usage access, no overlay and no special access.
+    it — no accessibility, no usage access and no overlay. An optional notification-access grant
+    (special access, off by default) lets the launcher count notification metadata for its signals;
+    it never reads notification content and can be revoked at any time.
   - Optional, off-by-default reactions: a finished focus session can play a short matrix animation,
     and (if you allow it) a brief camera-light flash with hard limits built in. Call signals use the
     audio mode only and never read caller names, numbers, SMS, contacts or call logs. Notification
@@ -69,7 +71,7 @@ Developed by thats.jainam.
   themselves: clear app storage or uninstall; nothing is stored on our servers".
 - Independent security review: No. Committed to Play Families policy: only if the app is declared
   to target children (see Content rating and audience).
-- Permissions to explain if asked: POST_NOTIFICATIONS, only for the optional focus reminders.
+- Permissions/special access to explain if asked: POST_NOTIFICATIONS, only for the optional focus reminders; optional notification access, metadata only and off by default.
 
 ## Content rating and audience
 - Answer the IARC questionnaire honestly: no violence, no user-generated content, no purchases, no ads,

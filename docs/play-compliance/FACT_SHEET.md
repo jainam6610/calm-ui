@@ -10,8 +10,9 @@ Merged (release): `StudentLauncher/app/build/intermediates/merged_manifests/rele
 
 | Fact | Evidence |
 |---|---|
-| Permissions (source) | `AndroidManifest.xml:5` → `POST_NOTIFICATIONS` only |
-| Permissions (release merged) | `aapt2 dump permissions app-release.apk` → `POST_NOTIFICATIONS` + `com.studentlauncher.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (auto-added by androidx.core for its own non-exported receiver; normal, not a user-facing permission) |
+| Permissions (source) | `AndroidManifest.xml:5` → `POST_NOTIFICATIONS` only (the notification-listener service at lines 71-79 is guarded by the system-held `BIND_NOTIFICATION_LISTENER_SERVICE`; it is not a requested `uses-permission`) |
+| Permissions (release merged) | `POST_NOTIFICATIONS` + `com.studentlauncher.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (auto-added by androidx.core for its own non-exported receiver; normal, not a user-facing permission) |
+| Optional special access | Notification access for `SignalsListenerService` (metadata only; off until the user grants it) — see §1.7 |
 | `QUERY_ALL_PACKAGES` | **absent** from source and merged manifest |
 | `<queries>` entries | `AndroidManifest.xml:7-29` → `MAIN/LAUNCHER` (app list), `DIAL`, `SENDTO smsto`, `VIEW https`, `IMAGE_CAPTURE`, `settings.SETTINGS` |
 | Exported components | `AndroidManifest.xml:40-54` `MainActivity` `exported="true"` with `MAIN` + `HOME` + `DEFAULT` + `LAUNCHER`; `AndroidManifest.xml:56-58` `FocusReminderReceiver` `exported="false"` |
@@ -86,6 +87,7 @@ No `BIND_APPWIDGET`, no `INSTALL_SHORTCUT`, no privileged permission requested (
 - Denial path: toast "Allow notifications so reminders can appear" (`MainActivity.kt:49-51`); everything else in the app keeps working — reminder scheduling itself does not depend on the grant (`FocusReminders.kt:32-40`), only the visible notification does.
 - Alarms: `AlarmManager.setAndAllowWhileIdle(ELAPSED_REALTIME_WAKEUP, …)` (`FocusReminders.kt:39`) — **inexact by design**, comment at line 38. No `USE_EXACT_ALARM`, no `SCHEDULE_EXACT_ALARM`, no `USE_FULL_SCREEN_INTENT` in manifest.
 - No `WorkManager`, no foreground services, no boot receiver.
+- **Notification listener** (`signals/SignalsListenerService.kt`): exported service guarded by the system-held `BIND_NOTIFICATION_LISTENER_SERVICE`; Android binds it only after the user grants notification access in Settings. `onNotificationPosted` reads package, category, post time, group-summary flag and importance rank only (`SignalsListenerService.kt:24-42`). It never reads `Notification.extras`, title, body, people or icons (`signals/NotificationSignals.kt:3-37`). Calls, services, progress, navigation, transport, system, alarm, event and reminder categories are filtered out (`NotificationSignals.kt:29-37`). The launcher works without the grant.
 
 ## §1.8 Third-party assets
 

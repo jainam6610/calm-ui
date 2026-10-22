@@ -63,8 +63,10 @@
         <h2>Permissions we request</h2>
         <ul>
             <li><strong>Notifications (optional, <code>POST_NOTIFICATIONS</code>):</strong> used only to show the focus reminder ("10 min on …") while you are in an app you marked as distracting. It is requested only when you turn reminders on, and you can withdraw it at any time in system settings. If you deny it, everything else in the app still works; only the reminder is missing.</li>
+            <li><strong>Notification access (optional, special access):</strong> if you grant it, the app's notification listener reads <strong>metadata only</strong> — the app package, category, post time, group-summary flag and importance. It never reads the title, body, people, icons or any other notification content. The access is off until you grant it in system settings, and you can revoke it at any time; the launcher works without it.</li>
         </ul>
-        <p>That is the only permission the app requests. There is no location, contacts, calendar, SMS, microphone, camera, storage, phone or usage-access permission.</p>
+        <p><code>POST_NOTIFICATIONS</code> is the only runtime permission the app requests. Notification access is a separate, optional special access you grant in Android Settings; it is not a manifest permission and the app cannot use it until you turn it on.</p>
+        <p>There is no location, contacts, calendar, SMS, microphone, camera, storage, phone or usage-access permission.</p>
 
         <h2>Installed apps</h2>
         <p>The app reads the list of installed apps only to show your home screen and app list. This list stays on your device and is never sent anywhere. The app does not use <code>QUERY_ALL_PACKAGES</code>.</p>

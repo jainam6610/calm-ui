@@ -42,6 +42,7 @@ Processed on device only, therefore not declared (each with its source):
 | App interactions / "other actions" (focus-session minutes) | self-tracked in local prefs (`LauncherViewModel.kt:307-333`); never transmitted |
 | Other user-generated content (tasks, events, expenses, GPA, habits, water, flashcards) | local `SharedPreferences` only (§1.4); never transmitted |
 | Other info (PIN) | salted PBKDF2 **hash** in local prefs (`PinLock.kt:85-88`); never transmitted |
+| Notification metadata (optional notification access) | package, category, post time, group-summary flag and importance only; held in memory by `SignalStore`, not written to disk and never transmitted (FACT_SHEET §1.7) |
 | Device or other IDs / crash logs / diagnostics | none collected (no analytics SDK, no `Log` calls: `rg 'Log\.|println' app/src` → 0 matches) |
 | Location, contacts, calendar, SMS, audio, health data (device health APIs) | no permission, no API usage (§1.1, §1.4) |
 
@@ -66,5 +67,6 @@ Processed on device only, therefore not declared (each with its source):
 | 6 | (not declared) PIN | "If you set a PIN, only a salted hash of it is stored… never the PIN itself" | `PinLock.kt:27,85-102` | ✅ |
 | 7 | No ads declaration (App content → Ads: **No**) | "no ads" | no ad SDK in deps (§1.8) | ✅ |
 | 8 | Security review: No | policy page makes no security-review claim | — | ✅ |
+| 9 | (not declared) notification metadata | "Notification access (optional, special access) … reads metadata only — the app package, category, post time, group-summary flag and importance" | `SignalsListenerService.kt:24-42`, `NotificationSignals.kt:3-37` | ✅ |
 
 Any mismatch would be ⚠️; none found after the `privacy.html` rewrite in this pass.
