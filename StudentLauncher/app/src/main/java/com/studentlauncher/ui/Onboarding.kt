@@ -216,8 +216,16 @@ private fun DoneStep() {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.Start) {
         Spacer(Modifier.weight(1f))
         Txt("You're all set.", 26f, c.fg, FontWeight.Medium, align = TextAlign.Start)
-        Spacer(Modifier.height(6.dp))
-        Txt("Long-press any app on your new home screen to fine-tune it.", 14f, c.fg2, maxLines = 3)
+        Spacer(Modifier.height(10.dp))
+        Txt("Swipe up on the Apps handle, or tap it, for all apps.", 14f, c.fg2)
+        Spacer(Modifier.height(7.dp))
+        Txt("Drag the A-Z rail to jump to a letter.", 14f, c.fg2)
+        Spacer(Modifier.height(7.dp))
+        Txt("Long-press a widget to select it, then drag its corner to resize.", 14f, c.fg2)
+        Spacer(Modifier.height(7.dp))
+        Txt("Swipe left on Home for the Widget Board.", 14f, c.fg2)
+        Spacer(Modifier.height(7.dp))
+        Txt("Long-press an app for app actions.", 14f, c.fg2)
         Spacer(Modifier.weight(1f))
     }
 }
