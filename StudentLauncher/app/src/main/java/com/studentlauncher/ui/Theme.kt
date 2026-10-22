@@ -215,7 +215,7 @@ fun <T> Segmented(
         )
         Box(
             Modifier.align(Alignment.CenterStart)
-                .offset(x = segW * pos + 2.dp)
+                .offset { IntOffset((segW * pos + 2.dp).roundToPx(), 0) }
                 .width((segW - 4.dp).coerceAtLeast(0.dp))
                 .height(28.dp)
                 .clip(RoundedCornerShape(8.dp)).background(c.knob)
@@ -287,7 +287,7 @@ fun GlassSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
         }
     ), contentAlignment = Alignment.Center) {
         Box(Modifier.width(44.dp).height(26.dp).clip(CircleShape).background(bg)) {
-            Box(Modifier.offset(x = x, y = 2.dp).size(22.dp).clip(CircleShape).background(if (on) c.knobOn else c.knob))
+            Box(Modifier.offset { IntOffset(x.roundToPx(), 2.dp.roundToPx()) }.size(22.dp).clip(CircleShape).background(if (on) c.knobOn else c.knob))
         }
     }
 }
