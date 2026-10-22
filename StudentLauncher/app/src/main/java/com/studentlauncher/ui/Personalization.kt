@@ -38,6 +38,7 @@ import com.studentlauncher.data.IconPack
 import com.studentlauncher.data.IconShape
 import com.studentlauncher.data.SettingsPage
 import com.studentlauncher.data.ThemeMode
+import com.studentlauncher.data.homeLimitOptions
 
 /** Shared scaffold for every Personalization sub-page: title, optional back, scrolling content. */
 @Composable
@@ -262,8 +263,18 @@ internal fun HomeSettingsPage(vm: LauncherViewModel) {
             SwitchSetting("Show app names", "Display labels under app icons", vm.showNames, vm::applyShowNames)
         }
         SettingSection("Home apps", "${vm.pinned.size}/${vm.homeAppLimit}") {
+            Txt("Grid columns", 12f, c.fg2)
+            Spacer(Modifier.height(6.dp))
             Segmented(
-                listOf(4 to "4", 6 to "6", 8 to "8", 10 to "10", 12 to "12"),
+                listOf(3 to "3", 4 to "4", 5 to "5"),
+                vm.homeColumns,
+                vm::applyHomeColumns
+            )
+            Spacer(Modifier.height(10.dp))
+            Txt("Apps on home", 12f, c.fg2)
+            Spacer(Modifier.height(6.dp))
+            Segmented(
+                homeLimitOptions(vm.homeColumns).map { it to "$it" },
                 vm.homeAppLimit,
                 vm::applyHomeAppLimit
             )

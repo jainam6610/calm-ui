@@ -189,7 +189,7 @@ fun HomeApps(
         val rowPx = (cellH + if (grid) with(density) { 10.dp.toPx() } else 0f).coerceAtLeast(1f)
         val rowStep = Math.round(dy / rowPx)
         val colStep = if (grid) Math.round(dx / cellW) else 0
-        val target = (startIdx + rowStep * if (grid) 4 else 1 + colStep).coerceIn(0, cur.size - 1)
+        val target = (startIdx + rowStep * if (grid) vm.homeColumns else 1 + colStep).coerceIn(0, cur.size - 1)
         if (target != i) {
             vm.movePinned(pkg, cur[target].pkg, after = target > i)
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -228,14 +228,14 @@ fun HomeApps(
 
     if (grid) {
         Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            list.chunked(4).forEach { rowApps ->
+            list.chunked(vm.homeColumns).forEach { rowApps ->
                 Row(Modifier.fillMaxWidth()) {
                     rowApps.forEach { a ->
                         Box(Modifier.weight(1f).then(cellMod(a.pkg)), contentAlignment = Alignment.Center) {
                             AppEntry(a, vm, EntryMode.Grid, launchGate, onMenu)
                         }
                     }
-                    repeat(4 - rowApps.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(vm.homeColumns - rowApps.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }

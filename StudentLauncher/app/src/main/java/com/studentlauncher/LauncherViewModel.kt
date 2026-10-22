@@ -353,7 +353,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8)); private set
+    /** Home grid columns (3..5). Kept as a real setting instead of the old fixed 4. */
+    var homeColumns by mutableIntStateOf(prefs.getInt("homeColumns", 4).coerceIn(3, 5)); private set
+    /** Always a whole number of rows for [homeColumns] (see data/HomeGrid.kt). */
+    var homeAppLimit by mutableStateOf(snapHomeLimit(prefs.getInt("homeAppLimit", 8), homeColumns)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
     var shuffleSlot by mutableStateOf(0); private set
     // ---- onboarding (v4 key, migrated from v2) ----
@@ -913,6 +916,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun applyHomeAppLimit(v: Int) { homeAppLimit = v.coerceIn(1, 16); prefs.edit().putInt("homeAppLimit", homeAppLimit).apply() }
+
+    /** Changing columns keeps the same number of rows, so the last row is never ragged. */
+    fun applyHomeColumns(v: Int) {
+        homeColumns = v.coerceIn(3, 5)
+        prefs.edit().putInt("homeColumns", homeColumns).apply()
+        val snapped = snapHomeLimit(homeAppLimit, homeColumns)
+        if (snapped != homeAppLimit) applyHomeAppLimit(snapped)
+    }
 
     // ---- optional PIN ----
     fun guarded(title: String, action: () -> Unit) {
