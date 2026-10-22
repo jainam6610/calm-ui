@@ -15,6 +15,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,12 +31,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -50,6 +55,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
@@ -57,10 +63,19 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
@@ -71,9 +86,11 @@ import com.studentlauncher.LauncherViewModel
 import com.studentlauncher.data.AlphaSide
 import com.studentlauncher.data.AppInfo
 import com.studentlauncher.data.DockStyle
+import com.studentlauncher.data.SettingsPage
 import com.studentlauncher.data.ThemeMode
 import com.studentlauncher.data.ViewMode
 import com.studentlauncher.data.InternalDestination
+import kotlin.math.abs
 import com.studentlauncher.mindful.ui.AppLimitsSheet
 import com.studentlauncher.mindful.ui.MindfulDoor
 import com.studentlauncher.mindful.ui.MindfulSettingsSheet
@@ -213,8 +230,10 @@ fun HomeLayer(
 ) {
     val c = LocalColors.current
     val dens = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     var launching by remember { mutableStateOf<LaunchAnim?>(null) }
     var lastToast by remember { mutableStateOf("") }
+    var homeMenu by remember { mutableStateOf(false) }
 
     // Phase 1: 0 = home, 1 = widget board. Swipe anywhere; dock stays put until Phase 2.
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -231,14 +250,18 @@ fun HomeLayer(
     val showHome by remember { derivedStateOf { prog.value < 0.99f } }
     val showPanel by remember { derivedStateOf { prog.value > 0.001f } }
 
-    val compact = screenH < 640.dp
+    // Compact density is a user preference now, not only a small-screen fallback.
+    val compact = vm.compactDensity || screenH < 640.dp
     val topPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topLimitPx = with(dens) { (topPad + 72.dp).toPx() }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { launching = null }
     BackHandler {
-        if (pagerState.currentPage == 1) scope.launch { pagerState.animateScrollToPage(0) }
-        else vm.back()
+        when {
+            homeMenu -> homeMenu = false
+            pagerState.currentPage == 1 -> scope.launch { pagerState.animateScrollToPage(0) }
+            else -> vm.back()
+        }
     }
 
     val launchApp: (AppInfo, Rect) -> Unit = { app, rect ->
@@ -286,11 +309,19 @@ fun HomeLayer(
                 beyondViewportPageCount = 0
             ) { page ->
                 if (page == 0) {
-                    HomePageContent(vm, launchApp, openMenu, prog, showHome, showPanel, compact)
+                    HomePageContent(
+                        vm, launchApp, openMenu, prog, showHome, showPanel, compact,
+                        onLongPressEmpty = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            homeMenu = true
+                        }
+                    )
                 } else {
                     WidgetBoard(vm, Modifier.fillMaxSize())
                 }
             }
+
+            AppsHandle(vm, prog)
 
             if (vm.dockStyle == DockStyle.Bottom && vm.dock.isNotEmpty()) {
                 Dock(vm, launchApp, openMenu, Modifier.navigationBarsPadding().padding(horizontal = 28.dp, vertical = 10.dp))
@@ -299,7 +330,7 @@ fun HomeLayer(
             }
         }
 
-        QuietHomeHeader(vm, Modifier.align(Alignment.TopCenter).statusBarsPadding())
+        QuietHomeHeader(vm, pagerState, Modifier.align(Alignment.TopCenter).statusBarsPadding())
 
         val ca = vm.ctxApp
         if (ca != null) {
@@ -350,12 +381,16 @@ fun HomeLayer(
             exit = slideOutVertically(Motion.Offset) { -it } + fadeOut()
         ) { ToastPill(lastToast) }
 
+        if (homeMenu) {
+            HomeMenuSheet(vm, onDismiss = { homeMenu = false })
+        }
+
         LaunchOverlay(launching, c.dark)
     }
 }
 
 @Composable
-private fun QuietHomeHeader(vm: LauncherViewModel, modifier: Modifier = Modifier) {
+private fun QuietHomeHeader(vm: LauncherViewModel, pagerState: PagerState, modifier: Modifier = Modifier) {
     val c = LocalColors.current
     val now = rememberNow()
     val is24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
@@ -364,7 +399,150 @@ private fun QuietHomeHeader(vm: LauncherViewModel, modifier: Modifier = Modifier
             Txt(now.format(java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM")).uppercase(), 11f, c.fg2, FontWeight.Bold)
             Txt(now.format(java.time.format.DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")), 25f, c.fg, FontWeight.SemiBold)
         }
+        PagerDots(pagerState)
+        Spacer(Modifier.width(10.dp))
         PillButton("Plan", { vm.destination = InternalDestination.Plan })
+    }
+}
+
+/** Two quiet dots; the second one tells people the Widget Board exists. */
+@Composable
+private fun PagerDots(pagerState: PagerState) {
+    val c = LocalColors.current
+    val page = pagerState.currentPage
+    Row(
+        Modifier.semantics {
+            contentDescription = "Page ${page + 1} of 2"
+        },
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(2) { i ->
+            Box(
+                Modifier
+                    .size(if (i == page) 16.dp else 6.dp, 6.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(if (i == page) c.accent else c.fg2.copy(alpha = 0.35f))
+            )
+        }
+    }
+}
+
+/**
+ * Swipe-up handle and visible All-Apps affordance. It lives above the dock, outside the widget
+ * scroll, so it never competes with widget scrolling, the Home pager, or system gestures.
+ */
+@Composable
+private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
+    val c = LocalColors.current
+    val haptic = LocalHapticFeedback.current
+    val motion = LocalMotionScale.current
+    val dens = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .semantics {
+                contentDescription = "Open all apps"
+                role = Role.Button
+                onClick("Open all apps") { vm.view = ViewMode.All; true }
+            }
+            .pointerInput(prog, motion) {
+                val distance = with(dens) { 180.dp.toPx() }
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val tracker = VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
+                    var claimed = false
+                    var lastDy = 0f
+                    while (true) {
+                        val ev = awaitPointerEvent()
+                        val ch = ev.changes.firstOrNull() ?: break
+                        if (!ch.pressed) break
+                        tracker.addPosition(ch.uptimeMillis, ch.position)
+                        val dx = ch.position.x - down.position.x
+                        val dy = ch.position.y - down.position.y
+                        if (!claimed) {
+                            if (abs(dx) > viewConfiguration.touchSlop && abs(dx) > abs(dy)) {
+                                return@awaitEachGesture // horizontal: the Home pager owns it
+                            }
+                            if (drawerGestureOwns(dx, dy, viewConfiguration.touchSlop)) {
+                                claimed = true
+                                ch.consume()
+                            } else if (dy > viewConfiguration.touchSlop) {
+                                return@awaitEachGesture // downward: leave it to the content
+                            }
+                        }
+                        if (claimed) {
+                            lastDy = dy
+                            if (motion >= 0.05f) {
+                                val target = drawerProgress(dy, distance)
+                                // The pointer scope is restricted; move the shared panel
+                                // Animatable on the composition scope instead.
+                                scope.launch { prog.snapTo(target) }
+                            }
+                            ch.consume()
+                        }
+                    }
+                    if (claimed) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        val velocity = tracker.calculateVelocity().y
+                        if (drawerShouldOpen(drawerProgress(lastDy, distance), velocity)) {
+                            vm.view = ViewMode.All
+                        } else {
+                            scope.launch {
+                                if (motion < 0.05f) prog.snapTo(0f)
+                                else prog.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = 320f))
+                            }
+                        }
+                    } else if (abs(lastDy) < viewConfiguration.touchSlop) {
+                        // A plain tap on the affordance also opens the panel.
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        vm.view = ViewMode.All
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            Modifier
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                .background(c.track.copy(alpha = 0.55f))
+                .padding(horizontal = 14.dp, vertical = 5.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Txt("Apps", 10f, c.fg2, FontWeight.Medium)
+            Txt("\u2191", 11f, c.fg2, FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun HomeMenuSheet(vm: LauncherViewModel, onDismiss: () -> Unit) {
+    val c = LocalColors.current
+    BottomSheet(onDismiss, 0.56f) {
+        Txt("HOME", 11f, c.fg2, FontWeight.Bold)
+        Txt("Make it yours", 20f, c.fg, FontWeight.Medium)
+        Spacer(Modifier.height(14.dp))
+        PillButton("Settings", {
+            onDismiss()
+            vm.settingsPage = SettingsPage.Root
+            vm.destination = InternalDestination.Settings
+        }, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        PillButton("Widgets", {
+            onDismiss()
+            vm.widgetCenter = true
+        }, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        PillButton("Wallpaper", {
+            onDismiss()
+            vm.settingsPage = SettingsPage.Wallpaper
+            vm.destination = InternalDestination.Settings
+        }, Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        Txt("Long-press an app for app actions. Long-press a widget to select and resize it.", 11f, c.fg2, maxLines = 2)
     }
 }
 
@@ -393,9 +571,14 @@ private fun HomePageContent(
     showHome: Boolean,
     showPanel: Boolean,
     compact: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLongPressEmpty: () -> Unit = {}
 ) {
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { onLongPressEmpty() }) }
+    ) {
         val areaH = maxHeight
         val letterH = (areaH * 0.6f / 28f).coerceIn(10.dp, 17.dp)
         val side = vm.alphaSide
