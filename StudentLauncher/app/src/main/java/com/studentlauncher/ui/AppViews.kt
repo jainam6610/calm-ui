@@ -72,6 +72,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.R
 import com.studentlauncher.data.AlphaSide
 import com.studentlauncher.data.AppInfo
 import com.studentlauncher.data.Chip
@@ -277,6 +279,8 @@ fun AlphaScrubber(vm: LauncherViewModel, letterH: Dp, modifier: Modifier = Modif
     val available = vm.availableLetters()
     val right = vm.alphaSide == AlphaSide.Right
     val fontSize = (letterH.value * 0.78f).coerceIn(9f, 12f)
+    val appAlphabet = stringResource(R.string.app_alphabet)
+    val idle = stringResource(R.string.idle)
 
     fun indexAt(y: Float) = (y / max(1, heightPx) * 28f).toInt().coerceIn(0, 27)
 
@@ -284,8 +288,8 @@ fun AlphaScrubber(vm: LauncherViewModel, letterH: Dp, modifier: Modifier = Modif
         modifier
             .width(48.dp)
             .semantics {
-                contentDescription = "App alphabet"
-                stateDescription = if (active >= 0) LETTERS[active] else "Idle"
+                contentDescription = appAlphabet
+                stateDescription = if (active >= 0) LETTERS[active] else idle
             }
             .onSizeChanged { heightPx = it.height }
             .pointerInput(Unit) {
@@ -366,7 +370,7 @@ fun AllAppsPanel(
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PillButton("Plan", { vm.destination = com.studentlauncher.data.InternalDestination.Plan }, Modifier.weight(1f))
-            PillButton("\u2699 Settings", { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
+            PillButton(stringResource(R.string.settings_gear), { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
         }
         Spacer(Modifier.height(10.dp))
         Segmented(listOf(Chip.All to "All", Chip.Study to "Study"), vm.chip, { vm.chip = it }, Modifier.width(170.dp))

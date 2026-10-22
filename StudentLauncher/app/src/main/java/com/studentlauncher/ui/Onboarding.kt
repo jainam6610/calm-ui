@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -217,15 +218,15 @@ private fun DoneStep() {
         Spacer(Modifier.weight(1f))
         Txt("You're all set.", 26f, c.fg, FontWeight.Medium, align = TextAlign.Start)
         Spacer(Modifier.height(10.dp))
-        Txt("Swipe up on the Apps handle, or tap it, for all apps.", 14f, c.fg2)
+        Txt(stringResource(R.string.onboard_gesture_apps), 14f, c.fg2)
         Spacer(Modifier.height(7.dp))
-        Txt("Drag the A-Z rail to jump to a letter.", 14f, c.fg2)
+        Txt(stringResource(R.string.onboard_gesture_rail), 14f, c.fg2)
         Spacer(Modifier.height(7.dp))
-        Txt("Long-press a widget to select it, then drag its corner to resize.", 14f, c.fg2)
+        Txt(stringResource(R.string.onboard_gesture_widget), 14f, c.fg2)
         Spacer(Modifier.height(7.dp))
-        Txt("Swipe left on Home for the Widget Board.", 14f, c.fg2)
+        Txt(stringResource(R.string.onboard_gesture_board), 14f, c.fg2)
         Spacer(Modifier.height(7.dp))
-        Txt("Long-press an app for app actions.", 14f, c.fg2)
+        Txt(stringResource(R.string.onboard_gesture_app_actions), 14f, c.fg2)
         Spacer(Modifier.weight(1f))
     }
 }

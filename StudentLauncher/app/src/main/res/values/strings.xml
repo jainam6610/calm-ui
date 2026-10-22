@@ -1,4 +1,31 @@
 <resources>
     <string name="app_name">Student Launcher</string>
     <string name="notification_signals">Notification signals</string>
+    <string name="apps">Apps</string>
+    <string name="open_all_apps">Open all apps</string>
+    <string name="page_of_2">Page %1$d of 2</string>
+    <string name="home_menu_kicker">HOME</string>
+    <string name="home_menu_title">Make it yours</string>
+    <string name="settings">Settings</string>
+    <string name="settings_gear">⚙ Settings</string>
+    <string name="widgets">Widgets</string>
+    <string name="wallpaper">Wallpaper</string>
+    <string name="home_menu_hint">Long-press an app for app actions. Long-press a widget to select and resize it.</string>
+    <string name="undo">Undo</string>
+    <string name="widget_removed">%1$s removed</string>
+    <string name="grid_columns">Grid columns</string>
+    <string name="apps_on_home">Apps on home</string>
+    <string name="accent_cd">Accent %1$s</string>
+    <string name="wallpaper_cd">Wallpaper %1$s</string>
+    <string name="custom_photo">Custom photo</string>
+    <string name="shuffle_photos">Shuffle photos</string>
+    <string name="wallpaper_slot">Wallpaper slot %1$d</string>
+    <string name="app_alphabet">App alphabet</string>
+    <string name="idle">Idle</string>
+    <string name="resize_widget">Resize widget</string>
+    <string name="onboard_gesture_apps">Swipe up on the Apps handle, or tap it, for all apps.</string>
+    <string name="onboard_gesture_rail">Drag the A-Z rail to jump to a letter.</string>
+    <string name="onboard_gesture_widget">Long-press a widget to select it, then drag its corner to resize.</string>
+    <string name="onboard_gesture_board">Swipe left on Home for the Widget Board.</string>
+    <string name="onboard_gesture_app_actions">Long-press an app for app actions.</string>
 </resources>

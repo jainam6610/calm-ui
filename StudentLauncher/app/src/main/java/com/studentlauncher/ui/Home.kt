@@ -71,6 +71,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -85,6 +86,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.R
 import com.studentlauncher.data.AlphaSide
 import com.studentlauncher.data.AppInfo
 import com.studentlauncher.data.DockStyle
@@ -422,9 +424,10 @@ private fun QuietHomeHeader(vm: LauncherViewModel, pagerState: PagerState, modif
 private fun PagerDots(pagerState: PagerState) {
     val c = LocalColors.current
     val page = pagerState.currentPage
+    val pageDesc = stringResource(R.string.page_of_2, page + 1)
     Row(
         Modifier.semantics {
-            contentDescription = "Page ${page + 1} of 2"
+            contentDescription = pageDesc
         },
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -451,14 +454,15 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
     val motion = LocalMotionScale.current
     val dens = LocalDensity.current
     val scope = rememberCoroutineScope()
+    val openAll = stringResource(R.string.open_all_apps)
     Box(
         Modifier
             .fillMaxWidth()
             .height(48.dp)
             .semantics {
-                contentDescription = "Open all apps"
+                contentDescription = openAll
                 role = Role.Button
-                onClick("Open all apps") { vm.view = ViewMode.All; true }
+                onClick(openAll) { vm.view = ViewMode.All; true }
             }
             .pointerInput(prog, motion) {
                 val distance = with(dens) { 180.dp.toPx() }
@@ -524,7 +528,7 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Txt("Apps", 10f, c.fg2, FontWeight.Medium)
+            Txt(stringResource(R.string.apps), 10f, c.fg2, FontWeight.Medium)
             Txt("\u2191", 11f, c.fg2, FontWeight.Medium)
         }
     }
@@ -539,9 +543,9 @@ private fun UndoPill(label: String, onUndo: () -> Unit) {
             .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Txt("$label removed", 12f, c.fg)
+        Txt(stringResource(R.string.widget_removed, label), 12f, c.fg)
         Spacer(Modifier.width(8.dp))
-        PillButton("Undo", onUndo)
+        PillButton(stringResource(R.string.undo), onUndo)
     }
 }
 
@@ -549,27 +553,27 @@ private fun UndoPill(label: String, onUndo: () -> Unit) {
 private fun HomeMenuSheet(vm: LauncherViewModel, onDismiss: () -> Unit) {
     val c = LocalColors.current
     BottomSheet(onDismiss, 0.56f) {
-        Txt("HOME", 11f, c.fg2, FontWeight.Bold)
-        Txt("Make it yours", 20f, c.fg, FontWeight.Medium)
+        Txt(stringResource(R.string.home_menu_kicker), 11f, c.fg2, FontWeight.Bold)
+        Txt(stringResource(R.string.home_menu_title), 20f, c.fg, FontWeight.Medium)
         Spacer(Modifier.height(14.dp))
-        PillButton("Settings", {
+        PillButton(stringResource(R.string.settings), {
             onDismiss()
             vm.settingsPage = SettingsPage.Root
             vm.destination = InternalDestination.Settings
         }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
-        PillButton("Widgets", {
+        PillButton(stringResource(R.string.widgets), {
             onDismiss()
             vm.widgetCenter = true
         }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
-        PillButton("Wallpaper", {
+        PillButton(stringResource(R.string.wallpaper), {
             onDismiss()
             vm.settingsPage = SettingsPage.Wallpaper
             vm.destination = InternalDestination.Settings
         }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
-        Txt("Long-press an app for app actions. Long-press a widget to select and resize it.", 11f, c.fg2, maxLines = 2)
+        Txt(stringResource(R.string.home_menu_hint), 11f, c.fg2, maxLines = 2)
     }
 }
 

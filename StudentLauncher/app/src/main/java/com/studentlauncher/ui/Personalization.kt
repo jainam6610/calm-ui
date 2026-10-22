@@ -29,12 +29,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.R
 import com.studentlauncher.data.DockStyle
 import com.studentlauncher.data.HomeLayout
 import com.studentlauncher.data.IconPack
@@ -171,10 +173,11 @@ internal fun ThemePage(vm: LauncherViewModel) {
                         row.forEach { id ->
                             val col = accentColor(id)
                             val on = vm.accentId == id
+                            val accentCd = stringResource(R.string.accent_cd, id)
                             Box(
                                 Modifier.size(48.dp)
                                     .semantics {
-                                        contentDescription = "Accent $id"
+                                        contentDescription = accentCd
                                         selected = on
                                     }
                                     .tap { vm.applyAccent(id) },
@@ -201,6 +204,8 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
         "shuffle" -> "Shuffle ${vm.shuffleCount}/5"
         else -> vm.wallpaper
     }
+    val customPhoto = stringResource(R.string.custom_photo)
+    val shufflePhotos = stringResource(R.string.shuffle_photos)
     SettingsScaffold("Wallpaper", onBack = { vm.settingsPage = SettingsPage.Personalization }) {
         SettingSection("Wallpaper", summary) {
             val previews = remember(c.dark) {
@@ -209,9 +214,10 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 previews.forEach { (id, bmp) ->
                     val on = vm.wallpaper == id
+                    val wallpaperCd = stringResource(R.string.wallpaper_cd, id)
                     Box(
                         Modifier.size(48.dp)
-                            .semantics { contentDescription = "Wallpaper $id"; selected = on }
+                            .semantics { contentDescription = wallpaperCd; selected = on }
                             .tap { vm.applyWallpaper(id) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -225,7 +231,7 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
                 val photo = vm.wallpaper == "photo"
                 Box(
                     Modifier.size(48.dp)
-                        .semantics { contentDescription = "Custom photo"; selected = photo }
+                        .semantics { contentDescription = customPhoto; selected = photo }
                         .tap { pickPhoto() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -238,7 +244,7 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
                 val shuffleOn = vm.wallpaper == "shuffle"
                 Box(
                     Modifier.size(48.dp)
-                        .semantics { contentDescription = "Shuffle photos"; selected = shuffleOn }
+                        .semantics { contentDescription = shufflePhotos; selected = shuffleOn }
                         .tap { vm.applyWallpaper("shuffle") },
                     contentAlignment = Alignment.Center
                 ) {
@@ -256,10 +262,11 @@ internal fun WallpaperPage(vm: LauncherViewModel, pickPhoto: () -> Unit, pickShu
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     (0 until Wallpapers.MAX_SHUFFLE).forEach { i ->
                         val filled = i < vm.shuffleCount
+                        val slotCd = stringResource(R.string.wallpaper_slot, i + 1)
                         Box(
                             Modifier.size(48.dp)
                                 .semantics {
-                                    contentDescription = "Wallpaper slot ${i + 1}"
+                                    contentDescription = slotCd
                                     selected = filled
                                 }
                                 .tap {
@@ -302,7 +309,7 @@ internal fun HomeSettingsPage(vm: LauncherViewModel) {
             SwitchSetting("Show app names", "Display labels under app icons", vm.showNames, vm::applyShowNames)
         }
         SettingSection("Home apps", "${vm.pinned.size}/${vm.homeAppLimit}") {
-            Txt("Grid columns", 12f, c.fg2)
+            Txt(stringResource(R.string.grid_columns), 12f, c.fg2)
             Spacer(Modifier.height(6.dp))
             Segmented(
                 listOf(3 to "3", 4 to "4", 5 to "5"),
@@ -310,7 +317,7 @@ internal fun HomeSettingsPage(vm: LauncherViewModel) {
                 vm::applyHomeColumns
             )
             Spacer(Modifier.height(10.dp))
-            Txt("Apps on home", 12f, c.fg2)
+            Txt(stringResource(R.string.apps_on_home), 12f, c.fg2)
             Spacer(Modifier.height(6.dp))
             Segmented(
                 homeLimitOptions(vm.homeColumns).map { it to "$it" },

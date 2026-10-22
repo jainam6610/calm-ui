@@ -91,6 +91,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -100,6 +101,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.R
 import com.studentlauncher.data.WT
 import com.studentlauncher.data.WidgetBg
 import com.studentlauncher.data.WidgetItem
@@ -335,6 +337,7 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
     val onBoard = vm.boardWidgets.any { it.id == w.id }
     val arranging = vm.selectedWidgetId != null &&
         (if (onBoard) vm.boardWidgets else vm.homeWidgets).any { it.id == vm.selectedWidgetId }
+    val resizeCd = stringResource(R.string.resize_widget)
     val stroke = when {
         selected -> c.accent.copy(alpha = 0.6f)
         arranging -> c.fg2.copy(alpha = 0.45f)
@@ -383,7 +386,7 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, content: @Composab
                         .align(Alignment.BottomEnd)
                         .padding(6.dp)
                         .size(48.dp)
-                        .semantics { contentDescription = "Resize widget" }
+                        .semantics { contentDescription = resizeCd }
                         .pointerInput(w.id) { // w.id ONLY — a height/half key would cancel mid-drag
                             awaitEachGesture {
                                 var accumV = 0f
