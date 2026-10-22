@@ -2,7 +2,10 @@ package com.studentlauncher
 
 import android.app.ActivityOptions
 import android.app.Application
+import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -12,6 +15,8 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
+import android.provider.AlarmClock
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -24,6 +29,8 @@ import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.studentlauncher.data.*
+import com.studentlauncher.detox.DetoxPolicy
+import com.studentlauncher.detox.DetoxStore
 import com.studentlauncher.mindful.MindfulEngine
 import com.studentlauncher.mindful.MindfulHost
 import com.studentlauncher.mindful.MindfulStore
@@ -49,6 +56,7 @@ import com.studentlauncher.ui.parseTasks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -115,7 +123,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Called when the activity starts: the light is never left on across a resume, and battery
-     * state starts tracking through the sticky broadcast (an event, not a poll).
+     * state starts tracking through the sticky broadcast (an event, not a poll). A Detoxify
+     * session that ran out, or time that passed while backgrounded, is caught up once here.
      */
     fun onActivityStart() {
         torch.beginSession()
@@ -125,10 +134,18 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 applyBattery(ctx.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
             }
         }
+        detoxHeartbeat()
+        ensureDetoxLoop()
     }
 
     fun onActivityStop() {
         torchOff()
+        // Freeze the anchors so the session resumes exactly where it was, however long it was away.
+        detox?.let {
+            detoxStore.save(DetoxPolicy.snapshot(it, SystemClock.elapsedRealtime(), System.currentTimeMillis()))
+        }
+        detoxJob?.cancel()
+        detoxJob = null
         if (batteryRegistered) {
             batteryRegistered = false
             runCatching { ctx.unregisterReceiver(batteryReceiver) }
@@ -409,6 +426,164 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var protectStudy by mutableStateOf(pin.protectStudyMode); private set
     var pinRequest by mutableStateOf<PinRequest?>(null)
 
+    // ---- Detoxify (v6): a timed quiet home, allow-listed, PIN-gated on the way out ----
+    private val detoxStore = DetoxStore(prefs)
+    var detox by mutableStateOf<DetoxPolicy.Session?>(detoxStore.load()); private set
+    var detoxLeft by mutableStateOf(initialDetoxLeft()); private set
+    /** Snapshot of the store value for UI; the store is authoritative. */
+    var detoxReleaseAt by mutableStateOf(detoxStore.releaseAt); private set
+    var detoxSheetOpen by mutableStateOf(false)
+    var detoxBlocked by mutableStateOf<String?>(null); private set
+    var detoxSummary by mutableStateOf<DetoxPolicy.Summary?>(DetoxPolicy.decodeSummary(detoxStore.summary)); private set
+
+    private var detoxJob: Job? = null
+    private var detoxBeat = 0
+
+    /** Phone, camera and clock are never blocked. Resolved once from the system's own answers. */
+    val detoxAlways: Set<String> = resolveDetoxAlways()
+
+    /** Remaining time right now, without waiting for the first heartbeat. */
+    private fun initialDetoxLeft(): Long =
+        detox?.let { DetoxPolicy.remainingMs(it, SystemClock.elapsedRealtime(), System.currentTimeMillis()) } ?: 0L
+
+    /**
+     * Phone/camera/clock packages: the system's resident handlers plus well-known vendor
+     * packages. Phone and camera also open through direct intents, so this list is mainly for
+     * showing them as always usable and for launching their packages. No new permissions.
+     */
+    private fun resolveDetoxAlways(): Set<String> {
+        val out = HashSet<String>()
+        val pm = ctx.packageManager
+        fun add(i: Intent) {
+            runCatching { pm.resolveActivity(i, 0)?.activityInfo?.packageName }.getOrNull()?.let { out.add(it) }
+        }
+        add(Intent(Intent.ACTION_DIAL))
+        runCatching { add(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)) }
+        add(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+        out.addAll(listOf(
+            "com.android.phone", "com.android.systemui",
+            "com.android.dialer", "com.google.android.dialer", "com.samsung.android.dialer",
+            "com.android.camera", "com.android.camera2", "com.google.android.GoogleCamera",
+            "com.sec.android.app.camera", "com.samsung.android.camera",
+            "com.android.deskclock", "com.google.android.deskclock", "com.sec.android.app.clockpackage"
+        ))
+        return out
+    }
+
+    /** All intents a session may open directly (dialer, camera shortcuts, alarms). */
+    fun openSystemIntent(i: Intent) {
+        try {
+            ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            toast = "not available on this phone"
+        }
+    }
+
+    /** Starts a session. [selected] is what the user ticked on the start sheet. */
+    fun startDetox(lengthMs: Long, selected: Set<String>) {
+        if (detox != null) return
+        val nowMono = SystemClock.elapsedRealtime()
+        val nowWall = System.currentTimeMillis()
+        val s = DetoxPolicy.Session(nowWall, lengthMs, DetoxPolicy.startAllowed(selected, detoxAlways), nowMono, lengthMs)
+        detox = s
+        detoxLeft = lengthMs
+        detoxReleaseAt = 0L
+        detoxStore.releaseAt = 0L
+        detoxBlocked = null
+        detoxStore.summary = ""
+        detoxSummary = null
+        detoxSheetOpen = false
+        goHome()
+        toast = "Detoxify is on"
+        ensureDetoxLoop()
+    }
+
+    private fun ensureDetoxLoop() {
+        if (detox == null) return
+        if (detoxJob?.isActive == true) return
+        detoxJob = viewModelScope.launch {
+            while (isActive && detox != null) {
+                delay(1000L)
+                detoxHeartbeat()
+            }
+        }
+    }
+
+    /**
+     * One tick: catch the remaining time up, auto-end at zero, run an overdue early-exit wait.
+     * Anchors are persisted about every half minute, and again whenever the activity stops.
+     */
+    fun detoxHeartbeat() {
+        val s = detox ?: return
+        val nowMono = SystemClock.elapsedRealtime()
+        val nowWall = System.currentTimeMillis()
+        val left = DetoxPolicy.remainingMs(s, nowMono, nowWall)
+        if (left <= 0L) { endDetox(endedByTimer = true); return }
+        if (DetoxPolicy.releaseDue(detoxReleaseAt, nowWall)) { endDetox(endedByTimer = false); return }
+        detoxLeft = left
+        detoxReleaseAt = detoxStore.releaseAt
+        if (++detoxBeat % 30 == 0) {
+            val snap = DetoxPolicy.snapshot(s, nowMono, nowWall)
+            detox = snap
+            detoxStore.save(snap)
+        }
+    }
+
+    private fun endDetox(endedByTimer: Boolean) {
+        val s = detox ?: return
+        val summary = DetoxPolicy.Summary(s.startedWall, s.lengthMs, s.allowed.size, endedByTimer)
+        detox = null
+        detoxLeft = 0L
+        detoxReleaseAt = 0L
+        detoxBlocked = null
+        detoxJob?.cancel()
+        detoxJob = null
+        detoxStore.clear()
+        detoxStore.summary = DetoxPolicy.encodeSummary(summary)
+        detoxSummary = summary
+        toast = if (endedByTimer) "Detoxify complete" else "Detoxify ended"
+        notifyDetoxDone(summary)
+    }
+
+    /** Clears the block explanation once the sheet is dismissed. */
+    fun clearDetoxBlock() { detoxBlocked = null }
+
+    fun dismissDetoxSummary() {
+        detoxSummary = null
+        detoxStore.summary = ""
+    }
+
+    /** A quiet "back to normal" nudge; the notification permission is respected by wrapping. */
+    private fun notifyDetoxDone(summary: DetoxPolicy.Summary) {
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
+        runCatching {
+            if (nm.getNotificationChannel(DETOX_CHANNEL) == null) {
+                val ch = NotificationChannel(DETOX_CHANNEL, "Detoxify", NotificationManager.IMPORTANCE_DEFAULT)
+                ch.description = "When a Detoxify session ends"
+                nm.createNotificationChannel(ch)
+            }
+            val open = PendingIntent.getActivity(
+                ctx, 0,
+                Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val n = Notification.Builder(ctx, DETOX_CHANNEL)
+                .setSmallIcon(R.drawable.ic_stat_focus)
+                .setContentTitle(if (summary.endedByTimer) "Detoxify complete" else "Detoxify ended")
+                .setContentText("Your phone is back to normal.")
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .build()
+            nm.notify(DETOX_NOTIF_ID, n)
+        }
+    }
+
+    private companion object {
+        const val DETOX_CHANNEL = "detox"
+        const val DETOX_NOTIF_ID = 4343
+    }
+
     // ---- Mindful engine (v4) ----
     val mindful = MindfulEngine(ctx, MindfulStore(prefs), MindfulHostAdapter())
 
@@ -627,6 +802,12 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startApp(pkg: String) {
+        // Detoxify: blocked before anything else, whatever screen the tap came from.
+        val d = detox
+        if (d != null && !DetoxPolicy.isAllowed(pkg, d, detoxAlways)) {
+            detoxBlocked = pkg
+            return
+        }
         val i = ctx.packageManager.getLaunchIntentForPackage(pkg) ?: return
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         if (pkg in flagged && reminderMin > 0) {

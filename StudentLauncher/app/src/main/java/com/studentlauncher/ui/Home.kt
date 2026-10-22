@@ -164,6 +164,7 @@ fun LauncherRoot(
                 !vm.onboardingComplete -> OnboardingFlow(vm)
                 vm.destination == InternalDestination.Plan -> PlanApp(vm)
                 vm.destination == InternalDestination.Settings -> SettingsApp(vm, pickPhoto, pickShufflePhotos, askNotifications)
+                vm.detox != null -> DetoxHome(vm)
                 else -> HomeLayer(vm, pickPhoto, addWidget, askNotifications, maxWidth, maxHeight)
             }
             SharedSheets(vm, addWidget)
@@ -185,6 +186,9 @@ private fun SharedSheets(vm: LauncherViewModel, addWidget: (AppWidgetProviderInf
     if (vm.mindful.settingsOpen) MindfulSettingsSheet(vm.mindful)
     if (vm.mindful.appLimitsOpen) AppLimitsSheet(vm)
     if (vm.pickHomeApps) HomeAppPicker(vm)
+    if (vm.detoxSheetOpen) DetoxStartSheet(vm)
+    if (vm.detoxBlocked != null) DetoxBlockSheet(vm)
+    if (vm.detoxSummary != null) DetoxSummarySheet(vm)
 }
 
 // ponytail: one sheet, reuses togglePin + BottomSheet — no new abstractions
