@@ -251,7 +251,7 @@ fun HomeLayer(
     val showPanel by remember { derivedStateOf { prog.value > 0.001f } }
 
     // Compact density is a user preference now, not only a small-screen fallback.
-    val compact = vm.compactDensity || screenH < 640.dp
+    val compact = isCompactHome(vm.compactDensity, screenH.value)
     val topPad = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topLimitPx = with(dens) { (topPad + 72.dp).toPx() }
 
