@@ -72,7 +72,7 @@ An APK is not distributed from GitHub. Build one yourself in a minute (below) 鈥
 |---|---|
 | Android | 8.0 Oreo (API 26) or newer |
 | Build | JDK 17, Android SDK 36 |
-| Toolchain | Gradle 9.8.2 路 AGP 8.9.1 路 Kotlin 2.1.20 路 Compose BOM 2025.04.01 |
+| Toolchain | Gradle 8.11.1 路 AGP 8.9.1 路 Kotlin 2.1.20 路 Compose BOM 2025.04.01 |
 
 ## Build
 

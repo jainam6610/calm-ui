@@ -15,12 +15,18 @@ updates:
     open-pull-requests-limit: 3
     labels: ["dependencies"]
     ignore:
-      # AGP 9 and core-ktx 1.16+ must move together with Gradle and Kotlin in one
-      # tested change. See issue #16. Remove these ignores when that lands.
+      # The Android toolchain has to move as one tested change: Gradle 9.6+ removes
+      # internal APIs that AGP 8.x still uses, AGP 9 needs Gradle 9, core-ktx 1.16+
+      # needs AGP 9.1, and Kotlin 2.4 needs a matching Compose compiler. See issue #16.
+      # Remove these ignores when that upgrade lands.
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "com.android.application"
-        update-types: ["version-update:semver-major"]
       - dependency-name: "com.android.tools.build:gradle"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin.android"
+        versions: [">= 2.2.0"]
+      - dependency-name: "org.jetbrains.kotlin.plugin.compose"
+        versions: [">= 2.2.0"]
       - dependency-name: "androidx.core:core-ktx"
         versions: [">= 1.16.0"]
       # Compose BOM upgrades are deliberate, tested changes, not drive-by bumps.
