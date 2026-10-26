@@ -98,7 +98,7 @@
 
         <!--
             Detoxify: Calm's own launcher, ported unchanged and started only by this app (no HOME /
-            LAUNCHER / browser filters, so Student Launcher keeps those roles). The one addition is a
+            LAUNCHER / browser filters, so Calm UI keeps those roles). The one addition is a
             session countdown: the launcher passes a deadline, Calm shows it in place of the clock and
             finishes itself when it runs out.
         -->

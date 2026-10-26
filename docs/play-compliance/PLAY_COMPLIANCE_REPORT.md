@@ -1,9 +1,11 @@
 # PLAY_COMPLIANCE_REPORT — StudentLauncher v3.0
 
 > **Repository note (2026-10-26):** the project moved to
-> [jainam6610/StudentLauncher](https://github.com/jainam6610/calm-ui) and the default branch is now `main`.
-> The policy URL is `https://jainam6610.github.io/calm-ui/privacy.html`. References to the old
-> `jainam662010-boop` location below have been updated; the audit itself is a snapshot of 2026-10-08.
+> [jainam6610/calm-ui](https://github.com/jainam6610/calm-ui), the default branch is `main`, and the
+> launcher is now called **Calm UI** for a general audience. The application ID is unchanged
+> (`com.studentlauncher`). The policy URL is `https://jainam6610.github.io/calm-ui/privacy.html`.
+> References to the old name and the old `jainam662010-boop` location below have been updated where
+> they describe current state; the audit itself is a snapshot of 2026-10-08.
 
 Audit date: **2026-10-08** · tree: local `master` @ `9c7e034` (+ this pass) · `versionCode 7` / `versionName 3.0`
 Verdicts: ✅ compliant with evidence · ⚠️ issue (fixed in-repo where marked, otherwise listed as a recommendation) · ❓ cannot be verified from the repo (needs Play Console, a device, or the developer).

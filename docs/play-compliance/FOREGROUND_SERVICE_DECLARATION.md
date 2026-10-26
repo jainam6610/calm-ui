@@ -1,6 +1,6 @@
 # Foreground service declaration — Play Console
 
-App: **Student Launcher** (`com.studentlauncher`), versionCode 12, versionName 3.2, targetSdk 36
+App: **Calm UI** (formerly Student Launcher; `com.studentlauncher`), versionCode 12, versionName 3.2, targetSdk 36
 Prepared: 2026-10-25
 Source of truth: `StudentLauncher/app/src/main/AndroidManifest.xml:8-9,121-128`,
 `StudentLauncher/app/src/main/java/com/studentlauncher/detox/DetoxGuardService.kt`
@@ -40,7 +40,7 @@ Paste this (494 characters):
 
 Longer version, only if the form allows more space:
 
-> Detoxify is an optional focus mode inside Student Launcher. The user picks a length
+> Detoxify is an optional focus mode inside Calm UI. The user picks a length
 > (1 hour, 1 day, 1 week or 30 days), picks the apps that stay available, and confirms
 > with their PIN. The launcher then hands the screen to the ported Calm home, which shows
 > the remaining time in place of the clock.
@@ -146,13 +146,13 @@ install of the build you are submitting.
 2. Make it the default Home app: **Settings → Apps → Default apps → Home app → Student
    Launcher**. If it is not the default launcher, pressing Home leaves the session screen
    and the demo looks wrong.
-3. Grant notifications *before* starting the session: open Student Launcher →
+3. Grant notifications *before* starting the session: open Calm UI →
    **Settings → Pauses & reminders → Allow reminders → Allow**. On Android 13+ this is the
    only place the app requests it, and without the grant the FGS notification will not
    appear in the shade.
 4. Turn off Do Not Disturb and battery saver. Set a long screen timeout. Record at 1080p
    with the status bar visible.
-5. Show the build once: **Settings → Version** should read **Student Launcher 3.2 (11)**.
+5. Show the build once: **Settings → Version** should read **Calm UI 3.2 (12)**.
 
 ### 5.2 Exact taps
 

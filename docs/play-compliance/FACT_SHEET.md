@@ -1,5 +1,9 @@
 # FACT_SHEET — StudentLauncher v3.0 ground truth
 
+> **Rebrand note (2026-10-26):** the app is now **Calm UI**. This fact sheet is a dated snapshot
+> taken under the previous name; evidence lines such as the in-app About copy describe that build,
+> not the current one. The application ID, permissions and data behaviour are unchanged.
+
 Audit date: **2026-10-08** (local `master` = `9c7e034`, 9 commits ahead of `origin/master`).
 Every row cites `file:line` or the exact command + its output. Nothing here is from memory.
 

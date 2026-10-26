@@ -25,7 +25,7 @@ Consequence: per the form flow ("If you selected Yes, confirm the following…")
 | Question | Answer if shown | Why |
 |---|---|---|
 | Is all collected data encrypted in transit? | Not applicable — the developer receives no data | browser traffic goes directly to the chosen site (FACT_SHEET §1.3) |
-| Do you provide a way for users to request deletion of their data? | Users delete everything themselves: Settings → Apps → Student Launcher → Storage → Clear storage, or uninstall | privacy.html "Retention and deletion" |
+| Do you provide a way for users to request deletion of their data? | Users delete everything themselves: Settings → Apps → Calm UI → Storage → Clear storage, or uninstall | privacy.html "Retention and deletion" |
 
 Do **not** tick a claim the app cannot honour (e.g. an in-app deletion-request form) — none exists.
 
