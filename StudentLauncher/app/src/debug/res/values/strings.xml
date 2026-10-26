@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Distinguishes the self-built debug install from the Play build on the same device. -->
+    <string name="app_name">Calm UI Debug</string>
+</resources>
