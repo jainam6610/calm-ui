@@ -8,7 +8,7 @@ No ads. No accounts. No tracking. Everything stays on your phone.
 [![Google Play](https://img.shields.io/badge/Google_Play-Download-3DDC84?logo=google-play&logoColor=white)](https://play.google.com/store/apps/details?id=com.studentlauncher)
 [![CI](https://github.com/jainam6610/calm-ui/actions/workflows/android.yml/badge.svg)](https://github.com/jainam6610/calm-ui/actions/workflows/android.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.21-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![minSdk](https://img.shields.io/badge/minSdk-26-34A853?logo=android&logoColor=white)](#requirements)
 
 <img src="docs/screenshots/home.jpg" width="260" alt="Calm UI home screen" />
@@ -72,7 +72,7 @@ An APK is not distributed from GitHub. Build one yourself in a minute (below) 鈥
 |---|---|
 | Android | 8.0 Oreo (API 26) or newer |
 | Build | JDK 17, Android SDK 36 |
-| Toolchain | Gradle 8.11.1 路 AGP 8.9.1 路 Kotlin 2.1.20 路 Compose BOM 2025.04.01 |
+| Toolchain | Gradle 8.14.6 路 AGP 8.9.1 路 Kotlin 2.1.21 路 Compose BOM 2025.04.01 |
 
 ## Build
 
