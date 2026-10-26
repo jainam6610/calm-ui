@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Download Calm UI
+    url: https://play.google.com/store/apps/details?id=com.studentlauncher
+    about: Install the current release from Google Play.
+  - name: Privacy policy
+    url: https://jainam6610.github.io/calm-ui/
+    about: How the app handles data — short version, nothing leaves your phone.
+  - name: Report a security issue
+    url: https://github.com/jainam6610/calm-ui/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.
+  - name: Ask a question
+    url: https://github.com/jainam6610/calm-ui/discussions
+    about: Setup help, ideas and general questions.

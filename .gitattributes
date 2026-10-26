@@ -1,0 +1,33 @@
+# Normalise line endings in the repository; Windows builds still get CRLF from git.
+* text=auto eol=lf
+
+*.kt text
+*.kts text
+*.java text
+*.xml text
+*.md text
+*.html text
+*.yml text
+*.yaml text
+*.json text
+*.gradle text
+*.pro text
+*.properties text
+
+# Binaries — never diff or convert
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.mp4 binary
+*.ttf binary
+*.otf binary
+*.jar binary
+*.jks binary
+*.keystore binary
+*.aab binary
+*.apk binary
+
+# Generated / vendored
+gradle/wrapper/gradle-wrapper.jar binary

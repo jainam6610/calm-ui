@@ -16,3 +16,12 @@ keystore.properties
 *.iml
 .DS_Store
 design-refs/
+
+# Local scratch material: screenshots, signing exports, ad-hoc dumps
+/kb.png
+/sel.png
+/st.png
+/st2.png
+/certificates.zip
+*.pem
+/.local/

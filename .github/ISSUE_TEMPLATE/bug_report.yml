@@ -1,0 +1,104 @@
+name: Bug report
+description: Something behaves incorrectly in Calm UI.
+title: "[bug] "
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search the existing issues first. For a security problem, use the
+        [private advisory form](https://github.com/jainam6610/calm-ui/security/advisories/new) instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: One or two sentences. What did the app do, and what did you expect instead?
+      placeholder: Tapping "Home ↓" closes the app panel but leaves the keyboard open.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Settings → About shows the version, for example 3.2.
+      placeholder: "3.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Install source
+      options:
+        - Google Play
+        - Built from source (debug)
+        - Built from source (release)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Samsung SM-G990E, Android 16 (One UI 8)
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably reproduce the problem.
+      placeholder: |
+        1. Open the All Apps panel
+        2. Tap the search field
+        3. Type "clock"
+        4. Press the Apps handle
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or recording
+      description: Drag images or video here. Blur anything personal first.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: If the app crashed, paste the relevant part of `adb logcat` (from the `FATAL EXCEPTION` line onwards).
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before posting
+      options:
+        - label: I am on the latest release (3.2 or newer) or the current default branch.
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I removed personal data (notification text, tasks, photos) from anything I attached.
+          required: true

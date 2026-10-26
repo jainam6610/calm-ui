@@ -1,0 +1,74 @@
+name: Feature request
+description: Suggest a focused improvement for Calm UI.
+title: "[feature] "
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Calm UI is deliberately small: local-first, no accounts, no ads,
+        no analytics. Requests that add a feed, a mandatory permission, a server or
+        a tracking SDK will be declined. See [CONTRIBUTING.md](https://github.com/jainam6610/calm-ui/blob/main/CONTRIBUTING.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What moment are you trying to improve?
+      description: Describe the moment in your day, not just the widget you want.
+      placeholder: Every morning I open the same three apps and want them one tap away without turning Home into a grid of twenty icons.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should happen?
+      description: The smallest change that solves it. Sketches are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing settings, widgets or workarounds you tried.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Home screen
+        - Widgets
+        - All Apps / search
+        - Plan
+        - Detoxify / quiet home
+        - Settings / Personalisation
+        - Glyph matrix / reactions
+        - Accessibility
+        - Docs or build
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This works offline and does not need an account, a server, ads or telemetry.
+          required: true
+        - label: This does not require a new sensitive permission (or I explain why it is essential).
+          required: true
+        - label: I searched existing issues and discussions first.
+          required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Mockups, examples from other launchers, edge cases.
+    validations:
+      required: false
