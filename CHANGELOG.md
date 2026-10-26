@@ -7,6 +7,10 @@ the [store page](https://play.google.com/store/apps/details?id=com.studentlaunch
 
 ## [Unreleased]
 
+### Changed
+
+- Gradle wrapper 8.14.6 and Kotlin 2.1.21 patch updates; the Compose compiler plugin follows the Kotlin version.
+
 ### Planned
 
 - Fix the PIN removal path and require the PIN to change it
