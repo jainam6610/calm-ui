@@ -11,6 +11,10 @@ the [store page](https://play.google.com/store/apps/details?id=com.studentlaunch
 
 - Gradle wrapper 8.14.6 and Kotlin 2.1.21 patch updates; the Compose compiler plugin follows the Kotlin version.
 
+### Fixed
+
+- Torch reactions no longer turn themselves off for the rest of the session when the camera is momentarily busy (a video call or another flashlight app). The app retries after 10 seconds and shows "Camera busy" instead of "No torch found".
+
 ### Planned
 
 - Fix the PIN removal path and require the PIN to change it

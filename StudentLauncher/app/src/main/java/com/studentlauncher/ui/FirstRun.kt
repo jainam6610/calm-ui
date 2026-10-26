@@ -189,7 +189,7 @@ private fun SignalsPage(vm: LauncherViewModel, requestNotifications: () -> Unit)
             )
             Spacer(Modifier.height(10.dp))
             SettingsToggle("Torch reactions", "Camera light flashes for finished sessions", "bolt", vm.torchEnabled, vm::applyTorchEnabled)
-            if (!vm.torch.available) {
+            if (!vm.torch.hasFlash) {
                 Spacer(Modifier.height(6.dp))
                 Txt("This device reports no flash unit, so torch reactions stay off.", 12f, c.fg2, maxLines = 2)
             }

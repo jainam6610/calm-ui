@@ -207,7 +207,7 @@ internal fun GlyphStudioPage(vm: LauncherViewModel) {
             SwitchSetting("Accent glow", "A soft halo behind lit and accent dots", vm.glyphGlow, vm::applyGlyphGlow)
         }
 
-        SettingSection("Torch reactions", if (vm.torchEnabled) (if (vm.torch.available) "On" else "No torch found") else "Off") {
+        SettingSection("Torch reactions", if (vm.torchEnabled) vm.torch.status else "Off") {
             Txt(
                 "Done maps to two short flashes; a priority signal maps to three at 2.5 Hz. Touch, breathing, charging and low battery never reach the torch.",
                 12f, c.fg2, maxLines = 4
@@ -215,7 +215,7 @@ internal fun GlyphStudioPage(vm: LauncherViewModel) {
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PillButton("Torch settings", { vm.settingsPage = SettingsPage.Root })
-                if (vm.torchEnabled && vm.torch.available) {
+                if (vm.torchEnabled && vm.torch.hasFlash) {
                     PillButton("Test", { vm.testTorch() })
                     PillButton("Preview Done", { vm.reactionDone() })
                 }

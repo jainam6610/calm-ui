@@ -44,6 +44,9 @@ object TorchLimits {
 
     /** Watchdog: the light is forced off this long after a session starts, no matter what. */
     const val WATCHDOG_MS = 3000L
+
+    /** Wait before retrying after the camera service refused the torch (camera busy). */
+    const val RETRY_AFTER_MS = 10_000L
 }
 
 /** How many flashes happened within the sliding window ending at [nowMs]. */
