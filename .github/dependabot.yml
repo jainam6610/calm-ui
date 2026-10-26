@@ -15,8 +15,14 @@ updates:
     open-pull-requests-limit: 3
     labels: ["dependencies"]
     ignore:
-      # Compose/AGP upgrades are deliberate, tested changes, not drive-by bumps.
+      # AGP 9 and core-ktx 1.16+ must move together with Gradle and Kotlin in one
+      # tested change. See issue #16. Remove these ignores when that lands.
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "com.android.tools.build:gradle"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "androidx.core:core-ktx"
+        versions: [">= 1.16.0"]
+      # Compose BOM upgrades are deliberate, tested changes, not drive-by bumps.
       - dependency-name: "androidx.compose:compose-bom"
         update-types: ["version-update:semver-major"]

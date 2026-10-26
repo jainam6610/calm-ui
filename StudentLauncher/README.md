@@ -8,7 +8,7 @@ Developed by **Jainam Karnawat** — [@jainam6610](https://github.com/jainam6610
 
 ## Build
 1. Open this folder in Android Studio (latest stable) and let Gradle sync. If Studio offers newer AGP, Kotlin or Compose versions, accept them.
-   Pinned versions: Gradle 8.11.1, AGP 8.9.1, Kotlin 2.1.20, Compose BOM 2025.04.01, compileSdk/targetSdk 36, minSdk 26.
+   Pinned versions: Gradle 9.8.2, AGP 8.9.1, Kotlin 2.1.20, Compose BOM 2025.04.01, compileSdk/targetSdk 36, minSdk 26.
 2. Run on a device or emulator, press Home and choose Calm UI as the default home app.
 3. Play Store: see docs/PLAY_STORE.md (signing, AAB, listing text, data safety, privacy policy, store graphics in store/).
 
