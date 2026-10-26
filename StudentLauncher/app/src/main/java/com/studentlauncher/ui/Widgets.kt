@@ -11,7 +11,6 @@ import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -30,6 +29,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,6 +53,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -72,7 +74,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -96,12 +101,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.studentlauncher.LauncherViewModel
-import com.studentlauncher.data.WIDGET_COLUMNS
 import com.studentlauncher.data.WT
 import com.studentlauncher.data.WidgetBg
 import com.studentlauncher.data.WidgetItem
-import com.studentlauncher.data.flowRows
-import com.studentlauncher.data.rowUsedColumns
+import com.studentlauncher.data.WidgetSpan
+import com.studentlauncher.data.packWidgetGrid
 import com.studentlauncher.mindful.ui.MindfulTodayContent
 import com.studentlauncher.mindful.ui.MindfulWeekContent
 import kotlinx.coroutines.Dispatchers
@@ -218,69 +222,177 @@ fun encodeTasks(l: List<Pair<Boolean, String>>): String =
 // Widget area
 // ---------------------------------------------------------------------------------------------
 
-/** Rows are packed by colSpan, preserving item order. A lone half leaves a hole. */
-internal fun buildRows(items: List<WidgetItem>): List<List<WidgetItem>> = flowRows(items)
-
 @Composable
-private fun Appear(content: @Composable () -> Unit) {
+private fun Appear(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val motion = LocalMotionScale.current
     val s = remember { MutableTransitionState(false).apply { targetState = true } }
     AnimatedVisibility(
         visibleState = s,
+        modifier = modifier,
         enter = if (motion < .05f) fadeIn(tween(0)) else fadeIn(tween((180 * motion).toInt())) + scaleIn(Motion.Macro, initialScale = 0.96f) + expandVertically(tween((220 * motion).toInt())),
         exit = fadeOut() + scaleOut(Motion.Macro, targetScale = 0.96f) + shrinkVertically(tween((180 * motion).toInt()))
     ) { content() }
 }
 
+private data class RevealFrame(
+    val scroll: Int,
+    val top: Float,
+    val bottom: Float,
+    val viewTop: Float,
+    val viewBottom: Float,
+    val resizing: Boolean
+)
+
 @Composable
 fun Widgets(vm: LauncherViewModel, padStart: Dp, padEnd: Dp, compact: Boolean, maxH: Dp, modifier: Modifier) {
     val c = LocalColors.current
-    val rows = buildRows(vm.homeWidgets.toList())
+    val items = vm.homeWidgets.toList()
     val scroll = rememberScrollState()
-    val arrangeHome = vm.selectedWidgetId != null && vm.homeWidgets.any { it.id == vm.selectedWidgetId }
+    var viewTop by remember { mutableFloatStateOf(Float.MIN_VALUE) }
     var viewBottom by remember { mutableFloatStateOf(Float.MAX_VALUE) }
-    // Selection first reveals: a frame corner under the window clip scrolls into view,
-    // then the scroll-away exit arms from the settled position (so the reveal itself
-    // never counts as the user browsing away).
+    // Selection reveal: keep both chrome edges reachable. When the tile fits we show its
+    // top-left minus badge and its bottom-right grip; a tile taller than the window keeps
+    // the grip visible (the Arrange bar still offers Remove). The loop re-arms whenever
+    // the frame or the window moves — a resize can push a corner under the clip.
     LaunchedEffect(vm.selectedWidgetId, scroll) {
         val sel = vm.selectedWidgetId ?: return@LaunchedEffect
-        val over = vm.frameBottomPx - viewBottom + 20f
-        if (over > 0f && viewBottom < Float.MAX_VALUE) scroll.animateScrollBy(over)
-        val anchor = scroll.value
-        snapshotFlow { scroll.value }.first { it != anchor }
+        var anchor = scroll.value
+        var blocked = false // window at its scroll limit: stop re-attempting (no spin)
+        while (vm.selectedWidgetId == sel) {
+            val frame = vm.widgetFrames[sel]
+            val frameTop = frame?.top ?: 0f
+            val frameBottom = frame?.bottom ?: 0f
+            val frameH = frameBottom - frameTop
+            val windowH = viewBottom - viewTop
+            var move = 0f
+            if (!vm.widgetResizing && frame != null && viewBottom < Float.MAX_VALUE && frameH > 0f) {
+                val below = frameBottom - viewBottom + 20f
+                val above = viewTop - frameTop + 12f
+                move = if (frameH <= windowH) {
+                    when {
+                        above > 0f -> -above
+                        below > 0f -> below
+                        else -> 0f
+                    }
+                } else if (below > 0f) below else 0f
+            }
+            if (!blocked && move != 0f) {
+                val before = scroll.value
+                scroll.animateScrollBy(move)
+                anchor = scroll.value
+                if (scroll.value == before) blocked = true
+                continue
+            }
+            val last = RevealFrame(
+                scroll.value, frameTop, frameBottom, viewTop, viewBottom, vm.widgetResizing
+            )
+            val woke = snapshotFlow {
+                val f = vm.widgetFrames[sel]
+                RevealFrame(
+                    scroll.value, f?.top ?: 0f, f?.bottom ?: 0f, viewTop, viewBottom,
+                    vm.widgetResizing
+                )
+            }.first { it != last }
+            if (woke.scroll != anchor) break // user scrolled away
+            blocked = false // frame or window moved: re-evaluate the reveal
+        }
         if (vm.selectedWidgetId == sel) vm.selectedWidgetId = null
     }
-    Box(
+    // The Arrange bar is a screen-level overlay (Home.kt) so it never covers the
+    // widget window's bottom edge where the corner resize handle lives.
+    LaunchedEffect(vm.selectedWidgetId) {
+        val sel = vm.selectedWidgetId
+        val anchored = vm.widgetAnchorId
+        if (sel == null || (anchored != null && anchored != sel)) vm.clearWidgetAnchor()
+    }
+    BoxWithConstraints(
         modifier.fillMaxWidth().heightIn(max = maxH)
-            .onGloballyPositioned { viewBottom = it.boundsInRoot().bottom }
+            .onGloballyPositioned {
+                val b = it.boundsInRoot()
+                viewTop = b.top
+                viewBottom = b.bottom
+            }
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(scroll)
-                .padding(start = padStart, end = padEnd),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        val gap = WIDGET_GRID_GAP_DP.dp
+        val available = (maxWidth - padStart - padEnd).coerceAtLeast(1.dp)
+        val cellW = widgetCellWidth(available)
+        val unit = widgetRowUnit(compact)
+        val anchorIndex = vm.widgetAnchorId
+            ?.let { id -> items.indexOfFirst { it.id == id } }
+            ?.takeIf { it >= 0 }
+        val slots = packWidgetGrid(
+            spans = items.map { WidgetSpan(it.colSpan, it.rowSpan) },
+            pinnedIndex = anchorIndex,
+            pinnedRow = vm.widgetAnchorRow,
+            pinnedCol = vm.widgetAnchorCol
+        )
+        val gridRows = slots.maxOfOrNull { it.row + it.rowSpan } ?: 0
+        val gridH = if (gridRows == 0) 0.dp else unit * gridRows + gap * (gridRows - 1)
+        // Soft bottom edge: the window can end mid-line, so fade the last few dp into the
+        // wallpaper instead of letting a card appear sliced. Only while there is more to see.
+        val fading = remember { derivedStateOf { scroll.canScrollForward && vm.selectedWidgetId == null } }
+        Box(
+            Modifier.fillMaxWidth().then(
+                if (fading.value) {
+                    Modifier.graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                } else Modifier
+            )
         ) {
-            rows.forEach { row ->
-                key(row.joinToString { it.id }) {
-                    Appear {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                            row.forEach { w -> Box(Modifier.weight(w.colSpan.toFloat())) { WidgetBody(w, vm, compact) } }
-                            val used = rowUsedColumns(row)
-                            if (used < WIDGET_COLUMNS) {
-                                Spacer(Modifier.weight((WIDGET_COLUMNS - used).toFloat()))
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scroll)
+                    .padding(start = padStart, end = padEnd)
+            ) {
+                Box(Modifier.fillMaxWidth().height(gridH)) {
+                    slots.forEach { slot ->
+                        val w = items[slot.index]
+                        key(w.id) {
+                            Appear(
+                                modifier = Modifier
+                                    .offset(
+                                        x = (cellW + gap) * slot.col,
+                                        y = (unit + gap) * slot.row
+                                    )
+                                    .width(widgetSpanWidth(w.colSpan, cellW))
+                                    .height(widgetFrameHeight(w.rowSpan, compact))
+                            ) {
+                                WidgetBody(
+                                    w = w,
+                                    vm = vm,
+                                    compact = compact,
+                                    cellWidth = cellW,
+                                    gridRow = slot.row,
+                                    gridCol = slot.col
+                                )
                             }
                         }
                     }
                 }
-            }
-            if (rows.isEmpty()) {
-                Box(Modifier.fillMaxWidth().glass(24.dp).tap { vm.widgetCenter = true }.padding(18.dp), contentAlignment = Alignment.Center) {
-                    Txt("No widgets yet. Tap to add one.", 13f, c.fg2)
+                if (items.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().glass(24.dp).tap { vm.widgetCenter = true }.padding(18.dp), contentAlignment = Alignment.Center) {
+                        Txt("No widgets yet. Tap to add one.", 13f, c.fg2)
+                    }
                 }
             }
+            if (fading.value) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(26.dp)
+                        .drawBehind {
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    0f to Color.Transparent,
+                                    1f to Color.Black
+                                ),
+                                blendMode = BlendMode.DstOut
+                            )
+                        }
+                )
+            }
         }
-        ArrangeBar(vm, arrangeHome, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
     }
 }
 
@@ -319,7 +431,16 @@ private fun TodayContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: C
 }
 
 @Composable
-private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, compact: Boolean, content: @Composable ColumnScope.(Color, Color) -> Unit) {
+private fun WidgetFrame(
+    w: WidgetItem,
+    vm: LauncherViewModel,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+    cellWidth: Dp? = null,
+    gridRow: Int? = null,
+    gridCol: Int? = null,
+    content: @Composable ColumnScope.(Color, Color) -> Unit
+) {
     val c = LocalColors.current
     val haptic = LocalHapticFeedback.current
     val fg = toneColor(w.tone, c)
@@ -331,53 +452,72 @@ private fun WidgetFrame(w: WidgetItem, vm: LauncherViewModel, compact: Boolean, 
     val arranging = vm.selectedWidgetId != null &&
         (if (onBoard) vm.boardWidgets else vm.homeWidgets).any { it.id == vm.selectedWidgetId }
     val stroke = when {
-        selected -> c.accent.copy(alpha = 0.6f)
+        selected -> c.fg.copy(alpha = 0.8f)
         arranging -> c.fg2.copy(alpha = 0.45f)
         else -> c.fg2.copy(alpha = 0.22f)
     }
+    val strokeWidth = if (selected) 1.5.dp else 1.dp
+    val radius = 22.dp
+    val shape = RoundedCornerShape(radius)
 
-    Column(Modifier.fillMaxWidth().then(if (selected) Modifier.animateContentSize(Motion.Size) else Modifier)) {
-        // Widget content with long-press to select
-        Box(
-            Modifier
-                .fillMaxWidth()
-                // Reveal math: Widgets() reads this to scroll a clipped corner into view.
-                .onGloballyPositioned { vm.frameBottomPx = it.boundsInRoot().bottom }
-                .then(
-                    when (w.bg) {
-                        WidgetBg.Glass -> Modifier.glass(12.dp).border(1.dp, stroke, RoundedCornerShape(12.dp))
-                        WidgetBg.Solid -> Modifier.clip(RoundedCornerShape(12.dp)).background(if (c.dark) Color(0xFF1C1C1E) else Color.White).border(1.dp, stroke, RoundedCornerShape(12.dp))
-                        WidgetBg.None -> if (selected || arranging) Modifier.border(1.dp, stroke, RoundedCornerShape(12.dp)) else Modifier
-                        WidgetBg.Frosted -> Modifier.glass(12.dp).drawBehind {
-                            drawRect(if (c.dark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.35f))
-                        }.border(1.dp, stroke, RoundedCornerShape(12.dp))
+    // Widget content with long-press to select. The frame is the tile itself now: the
+    // corners are rounder and the selection chrome (minus / grip) hugs its edges.
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(widgetFrameHeight(w.rowSpan, compact))
+            // Reveal math: Widgets() reads this to scroll a clipped corner into view.
+            .onGloballyPositioned {
+                vm.widgetFrames[w.id] = it.boundsInRoot()
+            }
+            .then(
+                when (w.bg) {
+                    WidgetBg.Glass -> Modifier.glass(radius)
+                        .border(strokeWidth, stroke, shape)
+                    WidgetBg.Solid -> Modifier.clip(shape)
+                        .background(if (c.dark) Color(0xFF0E0E11) else Color.White)
+                        .border(strokeWidth, stroke, shape)
+                    WidgetBg.None -> if (selected || arranging) Modifier.border(strokeWidth, stroke, shape) else Modifier
+                    WidgetBg.Frosted -> Modifier.glass(radius).drawBehind {
+                        // Frosted is a deliberately milkier sheet: more veil, less wallpaper.
+                        drawRect(if (c.dark) Color.White.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.55f))
+                    }.border(strokeWidth, stroke, shape)
+                }
+            )
+            .pointerInput(w.id) {
+                detectTapGestures(
+                    // In Arrange mode a plain tap re-targets (content taps win where they consume).
+                    onTap = { if (vm.selectedWidgetId != null) vm.selectedWidgetId = w.id },
+                    onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        vm.selectedWidgetId = w.id
+                        if (!vm.resizeHintShown) {
+                            vm.resizeHintShown = true
+                            vm.toast = "Drag the white grip to resize"
+                        }
                     }
                 )
-                .pointerInput(w.id) {
-                    detectTapGestures(
-                        // In Arrange mode a plain tap re-targets (content taps win where they consume).
-                        onTap = { if (vm.selectedWidgetId != null) vm.selectedWidgetId = w.id },
-                        onLongPress = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            vm.selectedWidgetId = w.id
-                            if (!vm.resizeHintShown) {
-                                vm.resizeHintShown = true
-                                vm.toast = "Drag corner to resize"
-                            }
-                        }
-                    )
-                }
-                .height(widgetFrameHeight(w.rowSpan, compact))
-                .padding(if (w.bg == WidgetBg.None) 6.dp else 12.dp)
-        ) {
-            Column { content(fg, fg2) }
-            if (selected) {
-                WidgetResizeHandle(
-                    w = w,
-                    vm = vm,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
-                )
             }
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(if (w.bg == WidgetBg.None) 6.dp else 12.dp)
+        ) { content(fg, fg2) }
+        if (selected) {
+            WidgetRemoveBadge(
+                onClick = { vm.removeWidget(w.id) },
+                modifier = Modifier.align(Alignment.TopStart)
+            )
+            WidgetResizeHandle(
+                w = w,
+                vm = vm,
+                compact = compact,
+                cellWidth = cellWidth,
+                gridRow = gridRow,
+                gridCol = gridCol,
+                modifier = Modifier.align(Alignment.BottomEnd)
+            )
         }
     }
 }
@@ -431,7 +571,7 @@ fun ArrangeBar(vm: LauncherViewModel, onPage: Boolean, modifier: Modifier = Modi
         val sel = vm.selectedWidgetId
         if (sel != null) {
             Row(
-                Modifier.glass(20.dp).padding(horizontal = 8.dp, vertical = 6.dp),
+                Modifier.glass(20.dp, GlassLevel.Chrome).padding(horizontal = 8.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 val w = vm.findWidget(sel)
@@ -446,19 +586,29 @@ fun ArrangeBar(vm: LauncherViewModel, onPage: Boolean, modifier: Modifier = Modi
 }
 
 @Composable
-fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, compact: Boolean) {
+fun WidgetBody(
+    w: WidgetItem,
+    vm: LauncherViewModel,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+    cellWidth: Dp? = null,
+    gridRow: Int? = null,
+    gridCol: Int? = null
+) {
     if (w.type == WT.ANDROID) {
-        HostedWidget(vm, w, compact, Modifier.fillMaxWidth())
+        HostedWidget(vm, w, compact, modifier, cellWidth, gridRow, gridCol)
         return
     }
-    WidgetFrame(w, vm, compact) { fg, fg2 -> WidgetContent(w, vm, fg, fg2, compact) }
+    WidgetFrame(w, vm, compact, modifier, cellWidth, gridRow, gridCol) { fg, fg2 ->
+        WidgetContent(w, vm, fg, fg2, compact)
+    }
 }
 
 /** Frame-free widget render — the frame adds gestures; the settings-sheet preview doesn't want them. */
 @Composable
 fun WidgetContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, fg2: Color, compact: Boolean) {
     val accent = LocalColors.current.accent
-    // Span 1..4 controls max vertical space; frame table lives in WidgetSpans.kt.
+    // Span 2..6 controls max vertical space; the row table lives in WidgetSpans.kt.
     val maxContentH = widgetContentHeight(w.rowSpan, compact)
     Column(Modifier.heightIn(max = maxContentH)) {
         when (w.type) {
@@ -523,12 +673,19 @@ private fun ClockContent(w: WidgetItem, style: String, fg: Color, fg2: Color, ac
         "Thin" -> Txt(time, 56f, fg, FontWeight.Thin)
         "Bold" -> Txt(time, 52f, fg, FontWeight.Black)
         "Neon" -> NeonText(time, accent)
-        "Binary" -> MonoText(binaryTime(now, is24), 22f, accent, FontWeight.Medium)
+        "Binary" -> BinaryDotClock(now, is24, fg, fg2, accent)
+        "Binary Digits" -> BinaryDigitClock(
+            time,
+            if (is24) now.hour else ((now.hour + 11) % 12) + 1,
+            now.minute,
+            fg, fg2
+        )
         "Roman" -> {
             val h = ((now.hour + 11) % 12) + 1
             Txt("${roman(h)}:${roman(now.minute).ifBlank { "—" }}", 42f, fg, FontWeight.Light, maxLines = 1)
         }
         "Gradient" -> GradientText(time, accent, fg)
+        "Liquid Glass" -> LiquidGlassClock(time, fg, fg2, accent)
         "c2", "Glyph Arc" -> GlyphArcClock(now, time, fg, fg2, accent)
         "c3", "Micrographics" -> MicrographicsClock(now, is24, fg, fg2, accent)
         "c4", "Day Name" -> DayNameClock(now, is24, fg, fg2, accent)
@@ -539,7 +696,7 @@ private fun ClockContent(w: WidgetItem, style: String, fg: Color, fg2: Color, ac
         val fmt = w.get("dateFmt", "EEE, d MMM")
         Txt(now.format(DateTimeFormatter.ofPattern(fmt, Locale.getDefault())), 12f, fg2, modifier = Modifier.padding(top = 8.dp))
     }
-    if (w.get("quote", "1") == "1") {
+    if (w.get("quote", "0") == "1") {
         AnimatedContent(
             targetState = q,
             transitionSpec = { fadeIn(tween(260)) togetherWith fadeOut(tween(140)) },
@@ -552,7 +709,7 @@ private fun ClockContent(w: WidgetItem, style: String, fg: Color, fg2: Color, ac
 
 internal val CLOCK_STYLES = listOf(
     "Dot", "Digital", "Words", "Analog", "Flip", "Split-Flap", "Retro Pixel",
-    "Thin", "Bold", "Neon", "Binary", "Roman", "Gradient",
+    "Thin", "Bold", "Neon", "Binary", "Binary Digits", "Roman", "Gradient", "Liquid Glass",
     "Glyph Arc", "Micrographics", "Day Name", "Segment LCD"
 )
 
@@ -822,10 +979,156 @@ private fun FlipCard(text: String, fg: Color, accent: Color, flap: Boolean) {
     }
 }
 
-private fun binaryTime(now: LocalDateTime, is24: Boolean): String {
+/**
+ * A true binary clock: four BCD columns (H tens, H units, M tens, M units), four bits each,
+ * read bottom-up 1-2-4-8. Nothing OS dot discipline, no digits to parse.
+ */
+@Composable
+internal fun BinaryDotClock(
+    now: LocalDateTime,
+    is24: Boolean,
+    fg: Color,
+    fg2: Color,
+    accent: Color,
+    compact: Boolean = false
+) {
     val h = if (is24) now.hour else ((now.hour + 11) % 12) + 1
-    fun d(n: Int) = Integer.toBinaryString(n).padStart(4, '0')
-    return "${d(h / 10)} ${d(h % 10)}:${d(now.minute / 10)} ${d(now.minute % 10)}"
+    val digits = listOf(h / 10, h % 10, now.minute / 10, now.minute % 10)
+    val dot = if (compact) 4.dp else 10.dp
+    val gap = if (compact) 2.dp else 4.dp
+    val columnGap = if (compact) 4.dp else 7.dp
+    val groupGap = if (compact) 8.dp else 18.dp
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BinaryGroup(digits.take(2), "H", fg, fg2, accent, dot, gap, columnGap, compact)
+        Spacer(Modifier.width(groupGap))
+        BinaryGroup(digits.drop(2), "M", fg, fg2, accent, dot, gap, columnGap, compact)
+        if (!is24) {
+            Spacer(Modifier.width(if (compact) 5.dp else 10.dp))
+            Txt(if (now.hour < 12) "AM" else "PM", if (compact) 7f else 11f, fg2, FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun BinaryGroup(
+    digits: List<Int>,
+    label: String,
+    fg: Color,
+    fg2: Color,
+    accent: Color,
+    dot: Dp,
+    gap: Dp,
+    columnGap: Dp,
+    compact: Boolean
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Txt(label, if (compact) 7f else 9f, fg2, FontWeight.Bold)
+        Spacer(Modifier.height(if (compact) 2.dp else 4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(columnGap)) {
+            digits.forEach { d ->
+                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                    for (bit in 3 downTo 0) {
+                        val on = (d and (1 shl bit)) != 0
+                        Box(
+                            Modifier
+                                .size(dot)
+                                .clip(CircleShape)
+                                .background(if (on) accent else fg.copy(alpha = 0.10f))
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Binary digits: each decimal digit is written as a four-bit value, hours then minutes, with the
+ * ordinary time underneath so the clock is still readable at a glance.
+ */
+internal fun binaryDigitGroups(hour: Int, minute: Int): List<String> {
+    fun encode(value: Int) = value.toString(2).padStart(4, '0')
+    fun digits(value: Int) = value.toString().padStart(2, '0')
+        .map { encode(it.digitToInt()) }
+        .joinToString(" ")
+    return listOf(digits(hour.coerceIn(0, 23)), digits(minute.coerceIn(0, 59)))
+}
+
+@Composable
+internal fun BinaryDigitClock(
+    time: String,
+    hour: Int,
+    minute: Int,
+    fg: Color,
+    fg2: Color,
+    compact: Boolean = false
+) {
+    val groups = binaryDigitGroups(hour, minute)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val chars = groups.sumOf { it.length } + 1
+        val bitSize = (maxWidth.value / (chars * 0.62f))
+            .coerceIn(8f, if (compact) 16f else 30f)
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                groups.forEachIndexed { i, group ->
+                    if (i > 0) {
+                        val gap = if (compact) 5.dp else 10.dp
+                        Spacer(Modifier.width(gap))
+                        MonoText(":", bitSize, fg2, FontWeight.Light)
+                        Spacer(Modifier.width(gap))
+                    }
+                    MonoText(group, bitSize, fg, FontWeight.Light)
+                }
+            }
+            Spacer(Modifier.height(if (compact) 3.dp else 7.dp))
+            MonoText(time, (bitSize * 0.62f).coerceAtLeast(9f), fg2, FontWeight.Light)
+        }
+    }
+}
+
+/** Apple-style liquid glass: a quiet capsule, a specular sweep, one accent dot. */
+@Composable
+internal fun LiquidGlassClock(
+    time: String,
+    fg: Color,
+    fg2: Color,
+    accent: Color,
+    compact: Boolean = false
+) {
+    val c = LocalColors.current
+    val radius = if (compact) 14.dp else 24.dp
+    val shape = RoundedCornerShape(radius)
+    val top = if (c.dark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.92f)
+    val bottom = if (c.dark) Color.White.copy(alpha = 0.04f) else Color.White.copy(alpha = 0.42f)
+    Box(
+        Modifier
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(top, bottom)))
+            .border(0.8.dp, Color.White.copy(alpha = if (c.dark) 0.28f else 0.7f), shape)
+            .padding(
+                horizontal = if (compact) 12.dp else 20.dp,
+                vertical = if (compact) 7.dp else 14.dp
+            )
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            val glow = Brush.radialGradient(
+                listOf(Color.White.copy(alpha = if (c.dark) 0.22f else 0.55f), Color.Transparent),
+                center = Offset(size.width * 0.18f, 0f),
+                radius = size.width * 0.75f
+            )
+            drawCircle(glow, radius = size.width * 0.75f, center = Offset(size.width * 0.18f, 0f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Txt(time, if (compact) 22f else 44f, fg, FontWeight.Light)
+            Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
+            Box(
+                Modifier
+                    .size(if (compact) 4.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(accent)
+            )
+        }
+    }
 }
 
 private fun roman(n: Int): String {
@@ -1235,11 +1538,40 @@ private fun QuickContent(fg: Color) {
 private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent: Color, compact: Boolean) {
     val scope = rememberCoroutineScope()
     // The widget is a live display: it renders whatever the launcher state says right now
-    // (notification reaction, charging, low battery, else the clock). Tap adds a ripple on the
-    // matrix only - touch never reaches the torch.
+    // (notification reaction, charging, low battery, else the user's ambient mode). Tap adds
+    // a ripple on the matrix only - touch never reaches the torch.
     var peek by remember { mutableStateOf<String?>(null) }
     var peekTick by remember { mutableIntStateOf(0) }
-    val mode = peek ?: vm.matrixState
+    var progressTick by remember { mutableIntStateOf(0) }
+    val widgetAmbient = w.get("ambient")
+    val resting = if (widgetAmbient.isNotBlank() && vm.matrixState == vm.glyphAmbient) {
+        widgetAmbient
+    } else {
+        vm.matrixState
+    }
+    val mode = peek ?: resting
+    // A focus ring is static geometry, but time still moves: refresh it in place.
+    LaunchedEffect(mode) {
+        if (mode != GlyphModes.FOCUS) return@LaunchedEffect
+        while (true) {
+            delay(15_000)
+            progressTick++
+        }
+    }
+    val progress = when (mode) {
+        GlyphModes.FOCUS -> {
+            progressTick
+            vm.glyphFocusProgress()
+        }
+        GlyphModes.TASKS -> vm.glyphTaskProgress()
+        else -> 0f
+    }
+    val dotScale = w.get("dot").toFloatOrNull() ?: vm.glyphDotScale
+    val glow = when (w.get("glow")) {
+        "1" -> true
+        "0" -> false
+        else -> vm.glyphGlow
+    }
     Box(
         Modifier.fillMaxWidth().tap {
             peek = GlyphModes.TAP
@@ -1258,7 +1590,11 @@ private fun GlyphContent(w: WidgetItem, vm: LauncherViewModel, fg: Color, accent
             Modifier.fillMaxWidth(if (compact) 0.55f else 0.62f).aspectRatio(1f),
             burstKey = if (peek != null) peekTick else vm.matrixTick,
             batteryPct = vm.batteryPct,
-            charging = vm.batteryCharging
+            charging = vm.batteryCharging,
+            progress = progress,
+            dotScale = dotScale,
+            glow = glow,
+            custom = vm.glyphCustomCells()
         )
     }
 }

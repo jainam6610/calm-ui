@@ -74,7 +74,14 @@ object WT {
 }
 
 internal const val WIDGET_COLUMNS = 4
-internal const val MAX_WIDGET_ROW_SPAN = 4
+
+/** Grid floor. A two-row tile is the smallest that still has room for a label and a value. */
+internal const val MIN_WIDGET_ROW_SPAN = 2
+internal const val MAX_WIDGET_ROW_SPAN = 6
+internal const val MIN_WIDGET_COL_SPAN = 2
+
+/** Pre-grid builds stored a tall Android widget as `size == 2`, which meant four rows. */
+internal const val LEGACY_TALL_ROW_SPAN = 4
 
 /** Width/height in grid spans. Order is position; there is no absolute row/column. */
 data class WidgetItem(
@@ -102,8 +109,8 @@ internal data class SpanSeed(
 
 internal data class WidgetSpan(val colSpan: Int, val rowSpan: Int)
 
-internal fun clampWidgetColSpan(v: Int) = v.coerceIn(1, WIDGET_COLUMNS)
-internal fun clampWidgetRowSpan(v: Int) = v.coerceIn(1, MAX_WIDGET_ROW_SPAN)
+internal fun clampWidgetColSpan(v: Int) = v.coerceIn(MIN_WIDGET_COL_SPAN, WIDGET_COLUMNS)
+internal fun clampWidgetRowSpan(v: Int) = v.coerceIn(MIN_WIDGET_ROW_SPAN, MAX_WIDGET_ROW_SPAN)
 
 /**
  * Legacy `half` was a flag, not a width: a lone half rendered full width because its
@@ -162,24 +169,105 @@ internal fun flowRows(items: List<WidgetItem>, columns: Int = WIDGET_COLUMNS): L
 internal fun rowUsedColumns(row: List<WidgetItem>, columns: Int = WIDGET_COLUMNS): Int =
     row.sumOf { it.colSpan.coerceIn(1, columns) }.coerceAtMost(columns)
 
-fun newWidget(type: String): WidgetItem {
-    val h = when (type) {
-        WT.DATE, WT.BATTERY, WT.NEXT, WT.COUNTDOWN, WT.TIMER, WT.WATER, WT.POMODORO, WT.EVENTS -> 1
-        WT.TASKS, WT.QUICK, WT.SPHERE, WT.GLYPH, WT.TODAY, WT.PLANNER, WT.FLASHCARDS, WT.FORMULAS, WT.ASSIGNMENTS, WT.REMINDERS -> 2
-        else -> 2
+/** One widget's resolved top-left cell on the Home grid. */
+internal data class WidgetGridSlot(
+    val index: Int,
+    val row: Int,
+    val col: Int,
+    val colSpan: Int,
+    val rowSpan: Int
+)
+
+/**
+ * Control-Center-style packing: each widget takes the first cell, scanning rows top-down
+ * and columns left-to-right, where its rectangle fits. This keeps tiles flush instead of
+ * leaving a hole whenever the previous row happens to be wider.
+ *
+ * When [pinnedIndex] is set (a tile being resized), it is placed first at
+ * [pinnedRow]/[pinnedCol] and everything else flows around it. Without that, growing a
+ * tile could make it leap to a later row mid-drag.
+ */
+internal fun packWidgetGrid(
+    spans: List<WidgetSpan>,
+    columns: Int = WIDGET_COLUMNS,
+    pinnedIndex: Int? = null,
+    pinnedRow: Int = 0,
+    pinnedCol: Int = 0
+): List<WidgetGridSlot> {
+    if (columns <= 0) return spans.mapIndexed { i, s -> WidgetGridSlot(i, i, 0, 1, 1) }
+    val occupied = HashSet<Int>()
+    val placed = arrayOfNulls<WidgetGridSlot>(spans.size)
+    val limit = spans.size * (MAX_WIDGET_ROW_SPAN + 1) + 1
+
+    fun put(index: Int, row: Int, col: Int, cs: Int, rs: Int) {
+        for (r in row until row + rs) {
+            for (c in col until col + cs) occupied += r * columns + c
+        }
+        placed[index] = WidgetGridSlot(index, row, col, cs, rs)
     }
+
+    val pin = pinnedIndex?.takeIf { it in spans.indices }
+    if (pin != null) {
+        val span = spans[pin]
+        val cs = span.colSpan.coerceIn(1, columns)
+        val rs = span.rowSpan.coerceAtLeast(1)
+        val row = pinnedRow.coerceAtLeast(0)
+        // Keep the old column when the new width still fits, otherwise slide left just
+        // enough. A height-only drag therefore never moves the tile sideways.
+        val col = pinnedCol.coerceIn(0, (columns - cs).coerceAtLeast(0))
+        put(pin, row, col, cs, rs)
+    }
+
+    spans.forEachIndexed { index, span ->
+        if (placed[index] != null) return@forEachIndexed
+        val cs = span.colSpan.coerceIn(1, columns)
+        val rs = span.rowSpan.coerceAtLeast(1)
+        var row = 0
+        while (row <= limit) {
+            val col = (0..columns - cs).firstOrNull { c -> gridFits(occupied, row, c, cs, rs, columns) }
+            if (col != null) {
+                put(index, row, col, cs, rs)
+                return@forEachIndexed
+            }
+            row++
+        }
+        // Unreachable in practice (the row limit grows faster than any legal tile).
+        put(index, row, 0, cs, rs)
+    }
+    return placed.mapIndexed { i, s -> s ?: WidgetGridSlot(i, i, 0, 1, 1) }
+}
+
+private fun gridFits(
+    occupied: Set<Int>,
+    row: Int,
+    col: Int,
+    colSpan: Int,
+    rowSpan: Int,
+    columns: Int
+): Boolean {
+    for (r in row until row + rowSpan) {
+        for (c in col until col + colSpan) {
+            if ((r * columns + c) in occupied) return false
+        }
+    }
+    return true
+}
+
+fun newWidget(type: String): WidgetItem {
+    // Every tile starts on the same uniform two-row unit; users grow it from the corner.
+    val h = MIN_WIDGET_ROW_SPAN
     return WidgetItem(
         id = UUID.randomUUID().toString(),
         type = type,
         rowSpan = h,
-        colSpan = if (h <= 1 || type in setOf(WT.WATER, WT.POMODORO)) 2 else WIDGET_COLUMNS,
+        colSpan = if (type in setOf(WT.WATER, WT.POMODORO)) 2 else WIDGET_COLUMNS,
         size = if (type in setOf(WT.PLANNER, WT.FLASHCARDS, WT.FORMULAS, WT.ASSIGNMENTS, WT.REMINDERS)) 1 else 0,
         cfg = when (type) {
             WT.CLOCK -> mapOf("style" to "Dot", "fmt" to "sys", "date" to "1", "quote" to "1")
             WT.NEXT -> mapOf("title" to "Physics", "time" to "10:30")
             WT.COUNTDOWN -> mapOf("title" to "Exam", "date" to "")
             WT.TIMER -> mapOf("min" to "25", "start" to "0")
-            WT.GLYPH -> mapOf("mode" to "Pulse")
+            WT.GLYPH -> emptyMap()
             WT.WEEK -> mapOf("mon" to "1")
             WT.TODAY -> emptyMap()
             WT.EXPENSES -> mapOf("budget" to "2000", "month" to java.time.YearMonth.now().toString())
@@ -207,7 +295,7 @@ fun List<WidgetItem>.toJson(): String {
                 .put("colSpan", w.colSpan).put("rowSpan", w.rowSpan)
                 // One-release compatibility for older builds reading this JSON.
                 .put("half", w.colSpan <= 2).put("size", w.size)
-                .put("height", w.rowSpan.coerceIn(1, 3))
+                .put("height", w.rowSpan.coerceIn(1, LEGACY_TALL_ROW_SPAN))
                 .put("tone", w.tone).put("cfg", cfg)
         )
     }
@@ -224,9 +312,13 @@ fun parseWidgets(s: String?): List<WidgetItem>? {
             val type = o.optString("type")
             // Old hosted widgets stored height in `size`, not in `height`.
             val legacyHeight = if (type == WT.ANDROID) {
-                when (o.optInt("size", 1)) { 0 -> 1; 2 -> MAX_WIDGET_ROW_SPAN; else -> 2 }
+                when (o.optInt("size", 1)) {
+                    0 -> MIN_WIDGET_ROW_SPAN
+                    2 -> LEGACY_TALL_ROW_SPAN
+                    else -> MIN_WIDGET_ROW_SPAN
+                }
             } else {
-                o.optInt("height", if (half) 1 else 2)
+                o.optInt("height", MIN_WIDGET_ROW_SPAN)
             }
             SpanSeed(
                 explicitColSpan = if (o.has("colSpan")) o.optInt("colSpan") else null,

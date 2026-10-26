@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Only permission: lets the focus reminder notification show on Android 13+. -->
+    <!-- Focus reminder notifications on Android 13+, and the built-in browser inside the Calm port. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Keeps a Detoxify deadline honest while another app is on screen. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <queries>
         <intent>
@@ -10,7 +14,21 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <intent>
             <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SHOW_ALARMS" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SHOW_TIMERS" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.APP_CALCULATOR" />
         </intent>
         <intent>
             <action android:name="android.intent.action.SENDTO" />
@@ -72,6 +90,48 @@
             android:name=".signals.SignalsListenerService"
             android:exported="true"
             android:label="@string/notification_signals"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!--
+            Detoxify: Calm's own launcher, ported unchanged and started only by this app (no HOME /
+            LAUNCHER / browser filters, so Student Launcher keeps those roles). The one addition is a
+            session countdown: the launcher passes a deadline, Calm shows it in place of the clock and
+            finishes itself when it runs out.
+        -->
+        <activity
+            android:name="com.calm.launcher.MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode|density|fontScale|locale"
+            android:screenOrientation="portrait"
+            android:stateNotNeeded="true"
+            android:enableOnBackInvokedCallback="false"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <!--
+            Enforces a Detoxify deadline while the user is inside another app. Foreground because
+            the launcher is not visible then; it ticks at most once an hour and stops itself when
+            the session ends.
+        -->
+        <service
+            android:name=".detox.DetoxGuardService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Countdown for the app's own Detoxify focus session" />
+        </service>
+
+        <!-- Calm's notification listener: the digest and the music screen. Opt-in in Settings. -->
+        <service
+            android:name="com.calm.launcher.NotifListener"
+            android:exported="true"
+            android:label="Calm digest"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />

@@ -2,15 +2,10 @@ package com.studentlauncher.ui
 
 import com.studentlauncher.data.WT
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -110,7 +105,7 @@ fun BottomSheet(
                     .fillMaxWidth()
                     .heightIn(max = maxH)
                     .graphicsLayer { translationY = (1f - e) * size.height * 1.15f }
-                    .glass(32.dp)
+                    .glass(32.dp, GlassLevel.Chrome)
                     .padding(20.dp)
             ) {
                 // Pinned above the scroll area: the live widget preview rides the sheet top.
@@ -147,22 +142,21 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
                 transformOrigin = TransformOrigin(0.2f, originY)
             }
             .onSizeChanged { h = it.height }
-            .glass(22.dp)
+            .glass(22.dp, GlassLevel.Chrome)
             .padding(6.dp)
     ) {
         val pinned = app.pkg in vm.pinned
         val docked = app.pkg in vm.dock
         CtxItem(if (pinned) "Remove from home" else "Pin to home") { visible.targetState = false; vm.togglePin(app.pkg) }
-        if (pinned) CtxItem("Rearrange apps") {
+        if (pinned || docked) CtxItem(if (pinned) "Rearrange apps" else "Rearrange dock") {
             visible.targetState = false
             vm.selectedWidgetId = null
             vm.arrangingApps = true
-            vm.toast = "Hold an app, then drag to rearrange"
+            vm.toast = if (pinned) "Hold an app, then drag to rearrange" else "Hold a dock app, then drag to reorder"
         }
         CtxItem(if (docked) "Remove from dock" else "Add to dock") { visible.targetState = false; vm.toggleDock(app.pkg) }
         CtxItem(if (app.pkg in vm.flagged) "Not distracting" else "Mark as distracting") { visible.targetState = false; vm.toggleFlag(app.pkg) }
         CtxItem(if (app.pkg in vm.studyApps) "Not a study app" else "Mark as study app") { visible.targetState = false; vm.toggleStudyApp(app.pkg) }
-        CtxItem("App info") { visible.targetState = false; vm.openAppInfo(app.pkg) }
     }
 }
 
@@ -188,16 +182,16 @@ fun PauseSheet(vm: LauncherViewModel, app: AppInfo, onCancel: () -> Unit, onOpen
         vm.incrementPauseCount()
         while (left > 0) { delay(1000); left-- }
     }
-    val breath = rememberInfiniteTransition(label = "breath")
-    val motion = LocalMotionScale.current
-    val bs by breath.animateFloat(
-        0.62f, 1f,
-        infiniteRepeatable(tween((4000 * motion).coerceAtLeast(1f).toInt(), easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "bs"
-    )
     BottomSheet(onCancel, 0.6f) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(56.dp).graphicsLayer { scaleX = bs; scaleY = bs }.clip(CircleShape).background(c.accent))
+            Box(
+                Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, c.fg2.copy(alpha = 0.35f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Txt("$left", 18f, c.fg, FontWeight.Light)
             }
             Spacer(Modifier.height(14.dp))
             Txt("Opening ${app.label}", 17f, c.fg, FontWeight.Medium)
@@ -213,7 +207,7 @@ fun PauseSheet(vm: LauncherViewModel, app: AppInfo, onCancel: () -> Unit, onOpen
                         val sel = chosen == mins
                         Box(
                             Modifier.clip(RoundedCornerShape(10.dp))
-                                .background(if (sel) c.accent else c.fg.copy(alpha = 0.1f))
+                                .background(if (sel) c.fg else c.fg.copy(alpha = 0.1f))
                                 .tap { chosen = mins; vm.unlockApp(app.pkg, mins); onOpen() }
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
@@ -267,7 +261,7 @@ fun PauseSheet(vm: LauncherViewModel, app: AppInfo, onCancel: () -> Unit, onOpen
 fun ToastPill(text: String) {
     val c = LocalColors.current
     Box(
-        Modifier.glass(20.dp).semantics { liveRegion = LiveRegionMode.Polite }
+        Modifier.glass(20.dp, GlassLevel.Chrome).semantics { liveRegion = LiveRegionMode.Polite }
             .padding(horizontal = 18.dp, vertical = 10.dp)
     ) { Txt(text, 13f, c.fg) }
 }

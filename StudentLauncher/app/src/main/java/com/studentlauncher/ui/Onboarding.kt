@@ -3,9 +3,7 @@ package com.studentlauncher.ui
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.provider.Settings
-import android.widget.VideoView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -21,7 +19,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,12 +45,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.studentlauncher.LauncherViewModel
 import com.studentlauncher.R
 import com.studentlauncher.data.AppInfo
 
-private const val STEP_VIDEO = 0
 private const val STEP_APPS = 1
 private const val STEP_LIMIT = 2
 private const val STEP_PIN = 3
@@ -67,12 +62,12 @@ private const val STEP_DONE = 4
 @Composable
 fun OnboardingFlow(vm: LauncherViewModel) {
     val c = LocalColors.current
-    var step by remember { mutableIntStateOf(STEP_VIDEO) }
+    var step by remember { mutableIntStateOf(STEP_APPS) }
 
     Box(Modifier.fillMaxSize().background(if (c.dark) Color.Black else Color(0xFFF2F2F4))) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(24.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (i in STEP_VIDEO..STEP_DONE) {
+                for (i in STEP_APPS..STEP_DONE) {
                     Box(
                         Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp))
                             .background(if (i <= step) c.accent else c.track)
@@ -91,7 +86,6 @@ fun OnboardingFlow(vm: LauncherViewModel) {
                 label = "onboarding"
             ) { s ->
                 when (s) {
-                    STEP_VIDEO -> VideoStep()
                     STEP_APPS -> AppsStep(vm)
                     STEP_LIMIT -> LimitStep(vm)
                     STEP_PIN -> PinStep(vm)
@@ -111,7 +105,7 @@ fun OnboardingFlow(vm: LauncherViewModel) {
                 if (step == STEP_DONE) {
                     PillButton("Get started", { vm.completeOnboarding() }, filled = true, modifier = Modifier.fillMaxWidth())
                 } else {
-                    if (step != STEP_VIDEO) PillButton("Skip", { step = STEP_DONE })
+                    if (step != STEP_APPS) PillButton("Skip", { step = STEP_DONE })
                     PillButton(
                         if (step == STEP_APPS) "Next (${vm.flagged.size} picked)" else "Next",
                         { step++ }, filled = true
@@ -129,30 +123,6 @@ private fun StepHeading(title: String, sub: String) {
     Spacer(Modifier.height(6.dp))
     Txt(sub, 14f, c.fg2, maxLines = 3)
     Spacer(Modifier.height(20.dp))
-}
-
-@Composable
-private fun VideoStep() {
-    val c = LocalColors.current
-    val ctx = LocalContext.current
-    Column(Modifier.fillMaxSize()) {
-        StepHeading("Meet Student Launcher", "A calmer home screen, built for studying.")
-        Box(
-            Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(28.dp)).background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            AndroidView(
-                factory = {
-                    VideoView(ctx).apply {
-                        setVideoURI(Uri.parse("android.resource://${ctx.packageName}/${R.raw.onboarding_ad}"))
-                        setOnPreparedListener { it.isLooping = true; start() }
-                        setOnErrorListener { _, _, _ -> true } // fails silently, Skip still works
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
 }
 
 @Composable

@@ -47,6 +47,18 @@ class DetoxPolicyTest {
     }
 
     @Test
+    fun calculatorsAndTimersAreAlwaysAvailable() {
+        val always = DetoxPolicy.alwaysPackages
+        assertTrue("com.google.android.calculator" in always)
+        assertTrue("com.android.calculator2" in always)
+        assertTrue("com.android.deskclock" in always)
+        assertTrue("com.sec.android.app.clockpackage" in always)
+        val s = session(allowed = emptySet())
+        assertTrue(DetoxPolicy.isAllowed("com.google.android.calculator", s, always))
+        assertTrue(DetoxPolicy.isAllowed("com.android.deskclock", s, always))
+    }
+
+    @Test
     fun theAlwaysSetIsIncludedInWhatAStartSendsHome() {
         val allowed = DetoxPolicy.startAllowed(
             selected = setOf("com.whatsapp", "com.spotify"),
@@ -131,15 +143,30 @@ class DetoxPolicyTest {
     }
 
     @Test
-    fun releaseWaitIsTenMinutesAndCannotBeDenied() {
-        val now = 5_000_000L
-        val releaseAt = now + DetoxPolicy.RELEASE_WAIT_MS
+    fun clockAndCalculatorSetsStayInsideTheAlwaysSet() {
+        assertTrue(DetoxPolicy.alwaysPackages.containsAll(DetoxPolicy.clockPackages))
+        assertTrue(DetoxPolicy.alwaysPackages.containsAll(DetoxPolicy.calculatorPackages))
+    }
+
+    @Test
+    fun leaveWaitIsTenMinutesAndTheMonotonicClockWins() {
+        val mono = 1_000_000L
+        val wall = 5_000_000L
         assertEquals(10 * 60_000L, DetoxPolicy.RELEASE_WAIT_MS)
-        assertEquals(10 * 60_000L, DetoxPolicy.releaseLeftMs(releaseAt, now))
-        assertEquals(0L, DetoxPolicy.releaseLeftMs(0L, now))
-        assertEquals(0L, DetoxPolicy.releaseLeftMs(now - 1L, now))
-        assertTrue(DetoxPolicy.releaseDue(releaseAt, now + 10 * 60_000L))
-        assertFalse(DetoxPolicy.releaseDue(releaseAt, now + 9 * 60_000L))
-        assertFalse(DetoxPolicy.releaseDue(0L, now))
+        assertEquals(10 * 60_000L, DetoxPolicy.waitLeftMs(mono, wall, mono, wall))
+        assertEquals(9 * 60_000L, DetoxPolicy.waitLeftMs(mono, wall, mono + 60_000L, wall + 60_000L))
+        // Moving the system clock forward cannot skip the wait.
+        assertEquals(9 * 60_000L, DetoxPolicy.waitLeftMs(mono, wall, mono + 60_000L, wall + 3 * HOUR))
+        assertEquals(0L, DetoxPolicy.waitLeftMs(mono, wall, mono + 10 * 60_000L, wall))
+        assertEquals(0L, DetoxPolicy.waitLeftMs(0L, 0L, mono, wall))
+    }
+
+    @Test
+    fun afterARebootTheLeaveWaitFallsBackToTheWallClockWithinTheCap() {
+        val wall = 5_000_000L
+        // elapsedRealtime restarted below the stored start, so the wall anchor takes over.
+        assertEquals(4 * 60_000L, DetoxPolicy.waitLeftMs(9_000_000L, wall, 1_000L, wall + 6 * 60_000L))
+        // A clock dragged backwards cannot make the wait longer than ten minutes.
+        assertEquals(10 * 60_000L, DetoxPolicy.waitLeftMs(9_000_000L, wall, 1_000L, wall - HOUR))
     }
 }

@@ -95,7 +95,7 @@ fun WallpaperEditor(vm: LauncherViewModel) {
                 .padding(14.dp)
                 .fillMaxWidth()
                 .graphicsLayer { translationY = (1f - e.value) * size.height * 1.2f }
-                .glass(32.dp)
+                .glass(32.dp, GlassLevel.Chrome)
                 .padding(20.dp)
         ) {
             Txt("Adjust wallpaper", 17f, c.fg, FontWeight.Medium)

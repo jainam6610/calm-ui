@@ -15,6 +15,9 @@ import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import android.text.format.DateFormat
+import com.studentlauncher.reactions.Flash
+import com.studentlauncher.reactions.TorchPatterns
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -64,34 +67,113 @@ object GlyphMatrixSpec {
     val count: Int get() = cells.size / 2
 }
 
-/** Reaction modes for the matrix. Durations of 0 are static (no frame loop, idle cost zero). */
+/**
+ * Every behaviour the matrix can show, with the personality it belongs to.
+ * Durations of 0 are static: they never schedule a frame.
+ */
 object GlyphModes {
     const val CLOCK = "Clock"
+    const val QUIET = "Quiet"
+    const val FOCUS = "Focus"
+    const val TASKS = "Tasks"
     const val PULSE = "Pulse"
+    const val ORBIT = "Orbit"
     const val SPIRAL = "Spiral"
     const val WAVE = "Wave"
+    const val DRIFT = "Drift"
     const val CHARGING = "Charging"
     const val BREATHE = "Breathe"
     const val DONE = "Done"
     const val TAP = "Tap"
+    const val SPARK = "Spark"
+    const val CUSTOM = "Custom"
     const val LOW = "Low"
+    const val OFF = "Off"
 
-    /** Cycle order used when tapping the glyph widget. */
-    val ALL = listOf(CLOCK, PULSE, SPIRAL, WAVE, CHARGING, BREATHE, DONE, TAP, LOW)
+    const val CAT_QUIET = "Quiet"
+    const val CAT_PRODUCTIVE = "Productive"
+    const val CAT_CREATIVE = "Creative"
+    const val CAT_COOL = "Cool"
+
+    val categories = listOf(CAT_QUIET, CAT_PRODUCTIVE, CAT_CREATIVE, CAT_COOL)
+
+    data class Meta(
+        val id: String,
+        val label: String,
+        val category: String,
+        val summary: String,
+        val durationMs: Int
+    )
+
+    /** Stable order: the tap-cycle, the studio list and the tests all read this. */
+    val catalog: List<Meta> = listOf(
+        Meta(CLOCK, "Clock", CAT_QUIET, "The time as four dot digits", 0),
+        Meta(QUIET, "Quiet", CAT_QUIET, "One dim centre dot", 0),
+        Meta(OFF, "Off", CAT_QUIET, "No light at rest", 0),
+        Meta(BREATHE, "Breathe", CAT_QUIET, "A slow ring, once", 3600),
+        Meta(FOCUS, "Focus ring", CAT_PRODUCTIVE, "Study timer as a ring", 0),
+        Meta(TASKS, "Task arc", CAT_PRODUCTIVE, "Completed tasks as an arc", 0),
+        Meta(DONE, "Done", CAT_PRODUCTIVE, "Draw a check mark", 900),
+        Meta(LOW, "Low battery", CAT_PRODUCTIVE, "A small centre dot", 0),
+        Meta(SPIRAL, "Spiral", CAT_CREATIVE, "A slow two-arm spiral", 1800),
+        Meta(WAVE, "Wave", CAT_CREATIVE, "Ripples across the grid", 1600),
+        Meta(DRIFT, "Drift", CAT_CREATIVE, "Three wandering points", 3600),
+        Meta(SPARK, "Spark", CAT_CREATIVE, "A bright scatter", 1200),
+        Meta(CUSTOM, "Custom art", CAT_CREATIVE, "Your own dots, drawn here", 0),
+        Meta(PULSE, "Pulse", CAT_COOL, "A ring sweeping outward", 1400),
+        Meta(ORBIT, "Orbit", CAT_COOL, "Two dots circling", 4200),
+        Meta(TAP, "Tap", CAT_COOL, "A quick touch ripple", 700),
+        Meta(CHARGING, "Charging", CAT_COOL, "Battery ring and bolt", 1600)
+    )
+
+    /** Every mode, in catalog order. */
+    val ALL: List<String> = catalog.map { it.id }
+
+    /** Modes that can be left on screen; all render without a frame loop. */
+    val ambient = listOf(CLOCK, QUIET, FOCUS, TASKS, CUSTOM, OFF)
+
+    fun meta(mode: String): Meta? = catalog.firstOrNull { it.id == mode }
+
+    fun byCategory(category: String): List<Meta> = catalog.filter { it.category == category }
 
     fun next(mode: String): String =
         ALL[(ALL.indexOf(mode).let { if (it < 0) 0 else it } + 1).mod(ALL.size)]
 
     /** Burst length in milliseconds; 0 means the frame loop never starts. */
-    fun durationMs(mode: String): Int = when (mode) {
-        PULSE -> 1400
-        SPIRAL -> 1800
-        WAVE -> 1600
-        BREATHE -> 3600
-        DONE -> 900
-        CHARGING -> 1600
-        TAP -> 700
-        else -> 0
+    fun durationMs(mode: String): Int = meta(mode)?.durationMs ?: 0
+}
+
+/**
+ * Custom art is a 625-character row-major bitmap (25 x 25). Only cells inside the circular
+ * mask are kept, so a saved design always fits the physical layout.
+ */
+fun encodeGlyphArt(cells: Set<Int>): String = buildString(GlyphMatrixSpec.GRID * GlyphMatrixSpec.GRID) {
+    for (i in 0 until GlyphMatrixSpec.GRID * GlyphMatrixSpec.GRID) {
+        val x = i % GlyphMatrixSpec.GRID
+        val y = i / GlyphMatrixSpec.GRID
+        append(if (i in cells && GlyphMatrixSpec.contains(x, y)) '1' else '0')
+    }
+}
+
+fun decodeGlyphArt(raw: String?): Set<Int> {
+    val size = GlyphMatrixSpec.GRID * GlyphMatrixSpec.GRID
+    if (raw == null || raw.length != size) return emptySet()
+    val out = HashSet<Int>(256)
+    for (i in 0 until size) {
+        if (raw[i] == '1') out.add(i)
+    }
+    return out
+}
+
+/**
+ * Which torch pattern, if any, belongs to a matrix reaction. Kept pure so the mapping can
+ * be tested without the camera light. Touch, breathing, charging and low battery never map.
+ */
+object GlyphTorch {
+    fun pattern(mode: String): List<Flash>? = when (mode) {
+        GlyphModes.DONE -> TorchPatterns.DONE
+        GlyphModes.PULSE -> TorchPatterns.ALERT
+        else -> null
     }
 }
 
@@ -136,8 +218,25 @@ private fun figureParam(pts: List<Pair<Float, Float>>, width: Float): FloatArray
     return out
 }
 
+/** 0 at the top, increasing clockwise to 1. */
+private fun angle01(x: Int, y: Int): Float {
+    val a = atan2((y - GlyphMatrixSpec.CENTER).toFloat(), (x - GlyphMatrixSpec.CENTER).toFloat())
+    var f = (a + PI.toFloat() / 2f) / (2f * PI.toFloat())
+    if (f < 0f) f += 1f
+    if (f >= 1f) f -= 1f
+    return f
+}
+
 /** Context needed to evaluate a reaction at a point. */
-class GlyphReaction(val clockLit: Set<Int>, val batteryPct: Int, val charging: Boolean)
+class GlyphReaction(
+    val clockLit: Set<Int>,
+    val batteryPct: Int,
+    val charging: Boolean,
+    /** 0..1 progress for the focus timer or completed-task arc. */
+    val progress: Float = 0f,
+    /** Saved dot-art cells for [GlyphModes.CUSTOM]. */
+    val custom: Set<Int> = emptySet()
+)
 
 /**
  * Brightness of a cell for a reaction. Pure, so the drawing code stays a thin loop and the
@@ -147,7 +246,24 @@ fun reactionLevel(mode: String, x: Int, y: Int, t: Float, ctx: GlyphReaction): F
     val idx = y * GlyphMatrixSpec.GRID + x
     val r = GlyphMatrixSpec.radius(x, y)
     return when (mode) {
+        GlyphModes.OFF -> 0f
+        GlyphModes.CUSTOM -> if (idx in ctx.custom) 1f else 0.04f
+        GlyphModes.QUIET -> if (r <= 1.8f) 0.55f else 0.04f
         GlyphModes.CLOCK -> if (idx in ctx.clockLit) 1f else 0.06f
+        GlyphModes.FOCUS -> {
+            val p = ctx.progress.coerceIn(0f, 1f)
+            val ringR = 3.2f + 8.4f * p
+            val ring = (1f - abs(r - ringR) / 1.15f).coerceIn(0f, 1f)
+            maxOf(ring, if (r <= 1.3f) 0.6f else 0f)
+        }
+        GlyphModes.TASKS -> {
+            val p = ctx.progress.coerceIn(0f, 1f)
+            when {
+                abs(r - 10.2f) > 0.95f -> 0.05f
+                angle01(x, y) <= p -> 1f
+                else -> 0.10f
+            }
+        }
         GlyphModes.PULSE -> {
             val front = t * 15.5f
             (1f - abs(r - front) / 2.4f).coerceIn(0f, 1f)
@@ -155,6 +271,39 @@ fun reactionLevel(mode: String, x: Int, y: Int, t: Float, ctx: GlyphReaction): F
         GlyphModes.TAP -> {
             val front = t * 14.5f
             (1f - abs(r - front) / 1.7f).coerceIn(0f, 1f)
+        }
+        GlyphModes.ORBIT -> {
+            val a = t * 2f * PI.toFloat()
+            val ax = 12f + cos(a) * 8.2f
+            val ay = 12f + sin(a) * 8.2f
+            val bx = 12f + cos(a + PI.toFloat()) * 8.2f
+            val by = 12f + sin(a + PI.toFloat()) * 8.2f
+            val d1 = hypot(x + 0.5f - ax, y + 0.5f - ay)
+            val d2 = hypot(x + 0.5f - bx, y + 0.5f - by)
+            when {
+                d1 <= 1.0f -> 1f
+                d2 <= 0.85f -> 0.8f
+                d1 <= 2.1f -> 0.28f
+                d2 <= 1.9f -> 0.18f
+                else -> 0.04f
+            }
+        }
+        GlyphModes.DRIFT -> {
+            var best = 0f
+            for (k in 0 until 3) {
+                val ph = k * 2.094f
+                val px = 12f + 7.2f * sin(t * 2f * PI.toFloat() + ph)
+                val py = 12f + 7.2f * cos(t * 3f * PI.toFloat() + ph * 1.7f)
+                val d = hypot(x + 0.5f - px, y + 0.5f - py)
+                best = maxOf(best, (1f - d / 1.6f).coerceIn(0f, 1f))
+            }
+            best
+        }
+        GlyphModes.SPARK -> {
+            val front = 2.5f + t * 11f
+            val ring = (1f - abs(r - front) / 1.3f).coerceIn(0f, 1f)
+            val core = if (r <= 2.2f) (1f - t * 1.2f).coerceAtLeast(0.25f) else 0f
+            maxOf(ring, core)
         }
         GlyphModes.SPIRAL -> {
             val a = atan2((y - 12f), (x - 12f))
@@ -200,6 +349,26 @@ fun reactionAccent(mode: String, x: Int, y: Int, t: Float, ctx: GlyphReaction): 
         GlyphModes.CLOCK -> idx == (12 * 25 + 12)
         GlyphModes.PULSE -> abs(r - t * 15.5f) < 0.9f
         GlyphModes.TAP -> abs(r - t * 14.5f) < 0.6f
+        GlyphModes.FOCUS -> {
+            val ringR = 3.2f + 8.4f * ctx.progress.coerceIn(0f, 1f)
+            abs(r - ringR) < 1.0f
+        }
+        GlyphModes.TASKS -> {
+            val p = ctx.progress.coerceIn(0f, 1f)
+            abs(r - 10.2f) <= 0.95f && abs(angle01(x, y) - p) < 0.035f
+        }
+        GlyphModes.ORBIT -> {
+            val a = t * 2f * PI.toFloat()
+            val ax = 12f + cos(a) * 8.2f
+            val ay = 12f + sin(a) * 8.2f
+            hypot(x + 0.5f - ax, y + 0.5f - ay) <= 1.0f
+        }
+        GlyphModes.DRIFT -> {
+            val px = 12f + 7.2f * sin(t * 2f * PI.toFloat())
+            val py = 12f + 7.2f * cos(t * 3f * PI.toFloat())
+            hypot(x + 0.5f - px, y + 0.5f - py) <= 1.3f
+        }
+        GlyphModes.SPARK -> abs(r - (2.5f + t * 11f)) < 1.1f
         GlyphModes.DONE -> CHECK_PARAM[idx] >= 0f
         GlyphModes.CHARGING -> ctx.charging && BOLT_PARAM[idx] >= 0f
         else -> false
@@ -235,7 +404,11 @@ fun GlyphMatrix(
     modifier: Modifier,
     burstKey: Int = 0,
     batteryPct: Int = 100,
-    charging: Boolean = false
+    charging: Boolean = false,
+    progress: Float = 0f,
+    dotScale: Float = 1f,
+    glow: Boolean = false,
+    custom: Set<Int> = emptySet()
 ) {
     val now = rememberNow()
     val is24 = DateFormat.is24HourFormat(LocalContext.current)
@@ -268,12 +441,12 @@ fun GlyphMatrix(
             emptySet()
         }
     }
-    val ctx = GlyphReaction(clockLit, batteryPct, charging)
+    val ctx = GlyphReaction(clockLit, batteryPct, charging, progress, custom)
 
     Canvas(modifier) {
         val grid = GlyphMatrixSpec.GRID
         val cell = size.minDimension / grid
-        val dot = cell * 0.74f
+        val dot = cell * 0.74f * dotScale.coerceIn(0.5f, 1.4f)
         val ox = (size.width - cell * grid) / 2f
         val oy = (size.height - cell * grid) / 2f
         val dim = ArrayList<Offset>(GlyphMatrixSpec.count)
@@ -292,8 +465,16 @@ fun GlyphMatrix(
                 if (reactionAccent(mode, x, y, t, ctx)) acc.add(o) else lit.add(o)
             }
         }
-        // At most four draw calls per frame.
-        drawPoints(dim, PointMode.Points, color.copy(alpha = 0.10f), dot, StrokeCap.Round)
+        // At most six draw calls per frame, and glow only when the option is on.
+        if (glow && lit.isNotEmpty()) {
+            drawPoints(lit, PointMode.Points, color.copy(alpha = 0.12f), dot * 2.2f, StrokeCap.Round)
+        }
+        if (glow && acc.isNotEmpty()) {
+            drawPoints(acc, PointMode.Points, accent.copy(alpha = 0.22f), dot * 2.4f, StrokeCap.Round)
+        }
+        if (mode != GlyphModes.OFF) {
+            drawPoints(dim, PointMode.Points, color.copy(alpha = 0.10f), dot, StrokeCap.Round)
+        }
         if (lit.isNotEmpty()) drawPoints(lit, PointMode.Points, color, dot, StrokeCap.Round)
         if (acc.isNotEmpty()) drawPoints(acc, PointMode.Points, accent, dot, StrokeCap.Round)
     }

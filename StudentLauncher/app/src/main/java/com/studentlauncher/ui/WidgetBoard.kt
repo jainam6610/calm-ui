@@ -1,18 +1,23 @@
 package com.studentlauncher.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +37,7 @@ import com.studentlauncher.data.WidgetItem
 import com.studentlauncher.data.flowRows
 import com.studentlauncher.data.flowRowsOfSpans
 import com.studentlauncher.data.rowUsedColumns
+import kotlinx.coroutines.flow.first
 
 /**
  * Pure swap step for board drag. Returns (indexDelta, newOffset) when the dragged
@@ -94,10 +100,43 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
     // The selected widget may live on Home while this page is visible — only lock scroll
     // when the selection actually belongs to this board.
     val selOnBoard = editingId != null && vm.boardWidgets.any { it.id == editingId }
+    val listState = rememberLazyListState()
+    // Selection first reveals: a selected frame whose corner handle would land under the
+    // list's bottom edge scrolls into view. Scroll is locked during selection, so without
+    // this a widget selected near the bottom edge could keep its handle unreachable. The
+    // loop re-arms on itemHeights changes — a resize can push the handle past the edge.
+    LaunchedEffect(editingId, selOnBoard, listState) {
+        val sel = editingId ?: return@LaunchedEffect
+        if (!selOnBoard) return@LaunchedEffect
+        val rowIndex = flowRows(vm.boardWidgets.toList()).indexOfFirst { row -> row.any { it.id == sel } }
+        if (rowIndex < 0) return@LaunchedEffect
+        val lazyIndex = 1 + rowIndex // header item sits at 0 while widgets exist
+        var blocked = false
+        var retries = 0
+        while (editingId == sel && retries < 60) {
+            withFrameNanos { } // let the selection/resize layout settle before measuring
+            val info = listState.layoutInfo
+            val item = info.visibleItemsInfo.firstOrNull { it.index == lazyIndex }
+            if (item == null) { retries++; continue }
+            val frameBottom = item.offset + (itemHeights[sel] ?: item.size.toFloat())
+            val limit = info.viewportEndOffset - 20
+            if (!blocked && frameBottom > limit) {
+                val before = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+                listState.animateScrollBy(frameBottom - limit)
+                val after = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+                if (after == before) blocked = true
+                continue
+            }
+            val lastH = itemHeights[sel]
+            snapshotFlow { itemHeights[sel] }.first { it != lastH }
+            blocked = false // a frame height changed (resize): re-evaluate the reveal
+        }
+    }
 
     Box(modifier) {
         LazyColumn(
             Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(10.dp),
             userScrollEnabled = !selOnBoard && dragId == null
         ) {
@@ -109,7 +148,7 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
             if (editingId != null) {
                 Txt("Arrange mode — drag to reorder, Done to finish", 11f, c.accent, modifier = Modifier.padding(top = 4.dp))
             } else {
-                Txt("Long-press a widget to edit", 11f, c.fg2, modifier = Modifier.padding(top = 4.dp))
+                Txt("Long-press a widget to resize · drag to arrange", 11f, c.fg2, modifier = Modifier.padding(top = 4.dp))
             }
         }
         if (vm.boardWidgets.isEmpty()) item {
@@ -175,7 +214,8 @@ fun WidgetBoard(vm: LauncherViewModel, modifier: Modifier = Modifier) {
         }
         item { Spacer(Modifier.height(20.dp)) }
         }
-        ArrangeBar(vm, selOnBoard, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
+        // The Arrange bar is a screen-level overlay (Home.kt) so it never covers the
+        // list's bottom edge where a selected frame's corner resize handle lives.
     }
 }
 

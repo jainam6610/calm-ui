@@ -19,8 +19,8 @@ android {
         applicationId = "com.studentlauncher"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "3.0"
+        versionCode = 12
+        versionName = "3.2"
     }
 
     signingConfigs {
@@ -35,6 +35,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Coexists with the Play-signed install so the phone keeps its data.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

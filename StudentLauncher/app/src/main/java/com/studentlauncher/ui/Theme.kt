@@ -68,6 +68,17 @@ import kotlin.math.roundToInt
 
 val NothingRed = Color(0xFFD71921)
 
+/**
+ * Reference palette: a black canvas, hairline light, muted micro-labels and one acid accent.
+ * Everything here is decorative only; colour never carries widget identity.
+ */
+object Ink {
+    val Canvas = Color(0xFF050506)
+    val Card = Color(0xFF0C0C0F)
+    val Hairline = Color(0x24FFFFFF)
+    val Lime = Color(0xFFD8FF3E)
+}
+
 // ponytail: centralised motion/spacing/type so every call site stays consistent
 object Motion {
     /** Sheets, panels, overlays — calm, not bouncy. */
@@ -83,7 +94,7 @@ object Motion {
 object Dim {
     val PaddingXs = 6.dp; val PaddingSm = 8.dp; val PaddingMd = 14.dp
     val PaddingLg = 20.dp; val PaddingXl = 24.dp
-    val CardRadius = 12.dp; val SheetRadius = 24.dp; val PillRadius = 24.dp
+    val CardRadius = 18.dp; val SheetRadius = 30.dp; val PillRadius = 24.dp
     val WidgetGap = 10.dp
 }
 
@@ -105,7 +116,7 @@ class LauncherColors(
 )
 
 fun launcherColors(dark: Boolean, accent: Color = NothingRed) = if (dark) {
-    LauncherColors(true, Color(0xFFF5F5F7), Color(0x99F5F5F7), Color(0x1AFFFFFF), Color(0x2EFFFFFF), Color.White, Color(0xFF111111), accent)
+    LauncherColors(true, Color(0xFFF7F7F8), Color(0xA6F7F7F8), Color(0x0FFFFFFF), Color(0x1AFFFFFF), Color.White, Color(0xFF111111), accent)
 } else {
     LauncherColors(false, Color(0xFF1C1C1E), Color(0x8C1C1C1E), Color(0x66FFFFFF), Color(0x291C1C1E), Color.White, Color.White, accent)
 }
@@ -117,6 +128,7 @@ fun accentColor(id: String): Color = when (id) {
     "orange" -> Color(0xFFFF9500)
     "teal" -> Color(0xFF30B0C7)
     "pink" -> Color(0xFFFF2D55)
+    "lime" -> Ink.Lime
     else -> NothingRed
 }
 
@@ -164,7 +176,8 @@ fun Txt(
     modifier: Modifier = Modifier,
     maxLines: Int = 1,
     align: TextAlign = TextAlign.Unspecified,
-    strike: Boolean = false
+    strike: Boolean = false,
+    tracking: Float = 0f
 ) {
     BasicText(
         text = text,
@@ -175,6 +188,7 @@ fun Txt(
             fontWeight = weight,
             fontFamily = LocalFontFamily.current,
             textAlign = align,
+            letterSpacing = tracking.sp,
             textDecoration = if (strike) TextDecoration.LineThrough else TextDecoration.None
         ),
         maxLines = maxLines,

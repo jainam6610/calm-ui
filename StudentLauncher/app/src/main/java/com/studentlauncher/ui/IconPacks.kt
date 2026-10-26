@@ -47,10 +47,18 @@ private val PACK_GRAY = ColorFilter.colorMatrix(ColorMatrix().apply { setToSatur
  * layer when it ships one; apps without a themed layer fall back to [IconPack.Original].
  */
 @Composable
-fun AppIconView(app: AppInfo, vm: LauncherViewModel, size: Dp, modifier: Modifier = Modifier) {
+fun AppIconView(
+    app: AppInfo,
+    vm: LauncherViewModel,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    packOverride: IconPack? = null,
+    shapeOverride: IconShape? = null
+) {
     val c = LocalColors.current
     val ic = vm.icons[app.pkg]
-    val requested = vm.iconPack
+    val requested = packOverride ?: vm.iconPack
+    val shapeKind = shapeOverride ?: vm.iconShape
     val glyph = ic?.mono
     // The stroke/grid packs need a themed glyph; without one they render like Original.
     val pack = when {
@@ -59,13 +67,13 @@ fun AppIconView(app: AppInfo, vm: LauncherViewModel, size: Dp, modifier: Modifie
         else -> requested
     }
 
-    val shape: Shape = when (vm.iconShape) {
+    val shape: Shape = when (shapeKind) {
         IconShape.Circle -> CircleShape
         IconShape.Squircle -> RoundedCornerShape(size * 0.32f)
         IconShape.None -> RectangleShape
     }
     val tileShape = RoundedCornerShape(size * 0.28f)
-    val chip = if (vm.iconShape == IconShape.None) Modifier else Modifier
+    val chip = if (shapeKind == IconShape.None) Modifier else Modifier
         .clip(shape)
         .background(c.tile)
         .border(
@@ -88,9 +96,9 @@ fun AppIconView(app: AppInfo, vm: LauncherViewModel, size: Dp, modifier: Modifie
         if (ic == null) return@Box
         when (pack) {
             IconPack.Original ->
-                Image(ic.original, null, Modifier.fillMaxSize().padding(originalPad(vm.iconShape, size)))
+                Image(ic.original, null, Modifier.fillMaxSize().padding(originalPad(shapeKind, size)))
             IconPack.Mono ->
-                TintedGlyph(ic, c.fg, originalPad(vm.iconShape, size))
+                TintedGlyph(ic, c.fg, originalPad(shapeKind, size))
             IconPack.Bubble ->
                 TintedGlyph(ic, c.fg, size * 0.26f)
             IconPack.Tile ->

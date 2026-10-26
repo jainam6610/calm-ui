@@ -69,7 +69,7 @@ enum class Chip { All, Study }
 enum class InternalDestination { Home, Plan, Settings }
 
 /** Sub-page shown inside the Settings app. [Root] is the top-level settings list. */
-enum class SettingsPage { Root, Personalization, Icons, Theme, Wallpaper, Home, Clock }
+enum class SettingsPage { Root, Personalization, Icons, Theme, Wallpaper, Home, Clock, Glyph, Calm, Focus, Signals, Advanced, Privacy }
 
 /** Lightweight, local-only study plan item.  Dates are ISO-8601 strings for stable persistence. */
 data class PlanTask(

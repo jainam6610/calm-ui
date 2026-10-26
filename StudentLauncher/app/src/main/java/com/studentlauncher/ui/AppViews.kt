@@ -73,7 +73,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
@@ -103,7 +106,8 @@ fun AppEntry(
     mode: EntryMode,
     onLaunch: (AppInfo, Rect) -> Unit,
     onMenu: (AppInfo, Rect) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    note: String? = null
 ) {
     val c = LocalColors.current
     val haptic = LocalHapticFeedback.current
@@ -113,7 +117,8 @@ fun AppEntry(
     var rect by remember { mutableStateOf(Rect.Zero) }
 
     // Arrange mode owns the gestures: hold-lift-drag on the wrapper, no launch/menu races.
-    val arrangingHome = vm.arrangingApps && (mode == EntryMode.List || mode == EntryMode.Grid)
+    val arrangingHome = vm.arrangingApps &&
+        (mode == EntryMode.List || mode == EntryMode.Grid || mode == EntryMode.Dock)
     val gestures = if (arrangingHome) Modifier else Modifier.combinedClickable(
         interactionSource = src,
         indication = null,
@@ -139,6 +144,13 @@ fun AppEntry(
                 if (flagged) Box(Modifier.padding(start = 8.dp).size(6.dp).background(c.accent, CircleShape))
                 if (mode == EntryMode.Panel && app.pkg in vm.studyApps) {
                     Txt("study", 11f, c.fg2, modifier = Modifier.padding(start = 8.dp))
+                }
+                if (note != null) {
+                    Box(
+                        Modifier.padding(start = 8.dp).clip(RoundedCornerShape(6.dp))
+                            .background(c.fg2.copy(alpha = 0.12f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) { Txt(note, 9.5f, c.fg2, FontWeight.Medium) }
                 }
             }
         }
@@ -368,13 +380,20 @@ fun AllAppsPanel(
     Column(
         modifier.fillMaxWidth().imePadding().padding(start = startPad, end = endPad, bottom = 8.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton("Plan", { vm.destination = com.studentlauncher.data.InternalDestination.Plan }, Modifier.weight(1f))
-            PillButton("Detoxify", { vm.openDetoxSetup() }, Modifier.weight(1f))
-            PillButton(stringResource(R.string.settings_gear), { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
+        // Search lives at the top: the IME can shrink the results list but never covers the field.
+        SearchField(vm) {
+            vm.appsForKey("q").firstOrNull()?.let { onLaunch(it, Rect(Offset.Zero, Offset.Zero)) }
         }
-        Spacer(Modifier.height(10.dp))
-        Segmented(listOf(Chip.All to "All", Chip.Study to "Study"), vm.chip, { vm.chip = it }, Modifier.width(170.dp))
+        if (!searching) {
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillButton("Plan", { vm.destination = com.studentlauncher.data.InternalDestination.Plan }, Modifier.weight(1f))
+                PillButton("Detoxify", { vm.openDetoxSheet() }, Modifier.weight(1f))
+                PillButton(stringResource(R.string.settings_gear), { vm.destination = com.studentlauncher.data.InternalDestination.Settings }, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Segmented(listOf(Chip.All to "All", Chip.Study to "Study"), vm.chip, { vm.chip = it }, Modifier.width(170.dp))
+        }
         Spacer(Modifier.height(12.dp))
         if (vm.normalScroll && key != "q") {
             NormalList(vm, Modifier.weight(1f).fillMaxWidth(), onLaunch, onMenu)
@@ -402,16 +421,15 @@ fun AllAppsPanel(
                     } else {
                         LazyColumn(Modifier.weight(1f)) {
                             items(results, key = { it.pkg }) { a ->
-                                AppEntry(a, vm, EntryMode.Panel, onLaunch, onMenu)
+                                AppEntry(
+                                    a, vm, EntryMode.Panel, onLaunch, onMenu,
+                                    note = if (k == "q") vm.placementNote(a.pkg) else null
+                                )
                             }
                         }
                     }
                 }
             }
-        }
-        Spacer(Modifier.height(8.dp))
-        SearchField(vm) {
-            vm.appsForKey("q").firstOrNull()?.let { onLaunch(it, Rect(Offset.Zero, Offset.Zero)) }
         }
     }
 }
@@ -469,7 +487,8 @@ private fun NormalList(
 private fun SearchField(vm: LauncherViewModel, onGo: () -> Unit) {
     val c = LocalColors.current
     Row(
-        Modifier.fillMaxWidth().height(46.dp).glass(23.dp).padding(horizontal = 16.dp),
+        Modifier.fillMaxWidth().height(48.dp).glass(24.dp, GlassLevel.Chrome)
+            .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Canvas(Modifier.size(16.dp)) {
@@ -491,6 +510,19 @@ private fun SearchField(vm: LauncherViewModel, onGo: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
         }
+        if (vm.query.isNotEmpty()) {
+            val clear = stringResource(R.string.clear_search)
+            Box(
+                Modifier.size(44.dp).clip(CircleShape)
+                    .semantics {
+                        contentDescription = clear
+                        role = Role.Button
+                        onClick(clear) { vm.query = ""; true }
+                    }
+                    .tap { vm.query = "" },
+                contentAlignment = Alignment.Center
+            ) { Txt("\u00D7", 20f, c.fg2, FontWeight.Light) }
+        }
     }
 }
 
@@ -505,13 +537,71 @@ fun Dock(
     onMenu: (AppInfo, Rect) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val list = vm.dock.mapNotNull { vm.appFor(it) }.filter { vm.isVisible(it) }
+    val haptic = LocalHapticFeedback.current
+    val arranging = vm.arrangingApps
+    fun visibleList() =
+        vm.dock.mapNotNull { vm.appFor(it) }.filter { vm.isVisible(it) }
+    val list = visibleList()
+    var dragPkg by remember { mutableStateOf<String?>(null) }
+    var startIdx by remember { mutableIntStateOf(0) }
+    var dx by remember { mutableFloatStateOf(0f) }
+    var cellW by remember { mutableFloatStateOf(1f) }
+    val launchGate: (AppInfo, Rect) -> Unit = { a, r -> if (!arranging) onLaunch(a, r) }
+
+    fun onDrag(drag: Offset) {
+        val pkg = dragPkg ?: return
+        dx += drag.x
+        val cur = visibleList()
+        val i = cur.indexOfFirst { it.pkg == pkg }
+        if (i < 0) return
+        val step = Math.round(dx / cellW.coerceAtLeast(1f))
+        val target = (startIdx + step).coerceIn(0, cur.size - 1)
+        if (target != i) {
+            vm.moveDock(pkg, cur[target].pkg, after = target > i)
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+
+    // Hold-then-drag reorders dock cells while arrange mode is on.
+    fun cellMod(pkg: String) = Modifier
+        .onSizeChanged { cellW = it.width.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer {
+            if (dragPkg == pkg) {
+                translationX = dx
+                scaleX = 1.08f
+                scaleY = 1.08f
+                shadowElevation = 10.dp.toPx()
+            }
+        }
+        .pointerInput(pkg, arranging) {
+            if (!arranging) return@pointerInput
+            detectDragGesturesAfterLongPress(
+                onDragStart = {
+                    dragPkg = pkg
+                    startIdx = visibleList().indexOfFirst { it.pkg == pkg }
+                    dx = 0f
+                },
+                onDragEnd = { dragPkg = null },
+                onDragCancel = { dragPkg = null },
+                onDrag = { _, drag -> onDrag(drag) }
+            )
+        }
+
     Row(
-        modifier.fillMaxWidth().height(68.dp).glass(34.dp).padding(horizontal = 12.dp),
+        modifier.fillMaxWidth().height(68.dp).glass(34.dp, GlassLevel.Chrome).padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        list.forEach { AppEntry(it, vm, EntryMode.Dock, onLaunch, onMenu) }
+        list.forEach { a ->
+            androidx.compose.runtime.key(a.pkg) {
+                Box(
+                    Modifier.weight(1f).then(cellMod(a.pkg)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AppEntry(a, vm, EntryMode.Dock, launchGate, onMenu)
+                }
+            }
+        }
     }
 }
 
@@ -523,18 +613,72 @@ fun DockRail(
     modifier: Modifier = Modifier
 ) {
     val c = LocalColors.current
-    val list = vm.dock.mapNotNull { vm.appFor(it) }.filter { vm.isVisible(it) }
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val arranging = vm.arrangingApps
+    fun visibleList() =
+        vm.dock.mapNotNull { vm.appFor(it) }.filter { vm.isVisible(it) }
+    val list = visibleList()
     if (list.isEmpty()) return
+    var dragPkg by remember { mutableStateOf<String?>(null) }
+    var startIdx by remember { mutableIntStateOf(0) }
+    var dy by remember { mutableFloatStateOf(0f) }
+    var cellH by remember { mutableFloatStateOf(1f) }
+    val launchGate: (AppInfo, Rect) -> Unit = { a, r -> if (!arranging) onLaunch(a, r) }
+
+    fun onDrag(drag: Offset) {
+        val pkg = dragPkg ?: return
+        dy += drag.y
+        val cur = visibleList()
+        val i = cur.indexOfFirst { it.pkg == pkg }
+        if (i < 0) return
+        val stepPx = (cellH + with(density) { 12.dp.toPx() }).coerceAtLeast(1f)
+        val step = Math.round(dy / stepPx)
+        val target = (startIdx + step).coerceIn(0, cur.size - 1)
+        if (target != i) {
+            vm.moveDock(pkg, cur[target].pkg, after = target > i)
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+
+    fun cellMod(pkg: String) = Modifier
+        .onSizeChanged { cellH = it.height.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer {
+            if (dragPkg == pkg) {
+                translationY = dy
+                scaleX = 1.08f
+                scaleY = 1.08f
+                shadowElevation = 10.dp.toPx()
+            }
+        }
+        .pointerInput(pkg, arranging) {
+            if (!arranging) return@pointerInput
+            detectDragGesturesAfterLongPress(
+                onDragStart = {
+                    dragPkg = pkg
+                    startIdx = visibleList().indexOfFirst { it.pkg == pkg }
+                    dy = 0f
+                },
+                onDragEnd = { dragPkg = null },
+                onDragCancel = { dragPkg = null },
+                onDrag = { _, drag -> onDrag(drag) }
+            )
+        }
+
     Column(
-        modifier.width(58.dp).glass(29.dp).padding(vertical = 14.dp),
+        modifier.width(58.dp).glass(29.dp, GlassLevel.Chrome).padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(3) { i ->
-                Box(Modifier.size(5.dp).background(if (i == 0) c.accent else c.fg2.copy(alpha = 0.5f), CircleShape))
+                Box(Modifier.size(5.dp).background(if (i == 0) c.fg else c.fg2.copy(alpha = 0.5f), CircleShape))
             }
         }
-        list.forEach { AppEntry(it, vm, EntryMode.Dock, onLaunch, onMenu) }
+        list.forEach { a ->
+            androidx.compose.runtime.key(a.pkg) {
+                Box(cellMod(a.pkg)) { AppEntry(a, vm, EntryMode.Dock, launchGate, onMenu) }
+            }
+        }
     }
 }

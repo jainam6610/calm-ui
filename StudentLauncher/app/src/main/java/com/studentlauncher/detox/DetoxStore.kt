@@ -35,19 +35,13 @@ class DetoxStore(private val prefs: SharedPreferences) {
             .apply()
     }
 
-    /** Ends the session; keeps the summary (if any) and cancels a pending early exit. */
+    /** Ends the session; keeps the summary (if any). */
     fun clear() {
         prefs.edit()
             .putBoolean(K_ACTIVE, false)
-            .putLong(K_RELEASE, 0L)
             .remove(K_STARTED).remove(K_LEN).remove(K_ALLOWED).remove(K_SAVED_MONO).remove(K_SAVED_LEFT)
             .apply()
     }
-
-    /** Wall-clock deadline of a pending early exit, or 0 when none is pending. */
-    var releaseAt: Long
-        get() = prefs.getLong(K_RELEASE, 0L)
-        set(value) { prefs.edit().putLong(K_RELEASE, value).apply() }
 
     /**
      * The last finished session, pipe-joined for the summary sheet
@@ -64,7 +58,6 @@ class DetoxStore(private val prefs: SharedPreferences) {
         const val K_ALLOWED = "detox_allowed"
         const val K_SAVED_MONO = "detox_saved_mono"
         const val K_SAVED_LEFT = "detox_saved_left"
-        const val K_RELEASE = "detox_release_at"
         const val K_SUMMARY = "detox_summary"
     }
 }

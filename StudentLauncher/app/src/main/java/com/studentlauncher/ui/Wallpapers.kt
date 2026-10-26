@@ -17,7 +17,7 @@ import java.io.File
 import java.time.LocalDate
 import kotlin.math.max
 
-class WallpaperSet(val full: ImageBitmap, val blurred: ImageBitmap)
+class WallpaperSet(val full: ImageBitmap, val blurred: ImageBitmap, val lum: Float)
 
 /** User adjustments: blur 0..1, dim 0..0.7, zoom 1..3, pan -1..1 (photo zoom is centred, then panned). */
 class WpAdjust(
@@ -205,7 +205,8 @@ object Wallpapers {
         if (adj.zoom > 1.001f) full = zoomPan(full, adj)
         if (adj.blur > 0.01f) full = softBlur(full, adj.blur)
         if (adj.dim > 0.01f) Canvas(full).drawColor((adj.dim.coerceIn(0f, 0.8f) * 255).toInt() shl 24)
-        return WallpaperSet(full.asImageBitmap(), blur(full).asImageBitmap())
+        val soft = blur(full)
+        return WallpaperSet(full.asImageBitmap(), soft.asImageBitmap(), luminance(soft))
     }
 
     private fun zoomPan(src: Bitmap, a: WpAdjust): Bitmap {
@@ -227,10 +228,37 @@ object Wallpapers {
     }
 
     /**
-     * Frosted copy that glass surfaces sample, kept at blur resolution (72px wide) instead of
-     * upscaled back to screen size — saves a full-size bitmap; GlassEnv scales its sample coords.
+     * Frosted copy that glass surfaces sample. Kept at 160px wide — enough colour and light for
+     * chrome to feel like glass, small enough to stay cheap — and sampled with scaled coords by
+     * GlassEnv.
      */
-    fun blur(src: Bitmap): Bitmap = blurTo(src, 72, 3, 3, upscale = false)
+    fun blur(src: Bitmap): Bitmap = blurTo(src, 160, 4, 3, upscale = false)
+
+    /** Mean perceived luminance of the wallpaper, sampled sparsely. */
+    private fun luminance(src: Bitmap): Float {
+        val w = src.width
+        val h = src.height
+        if (w <= 0 || h <= 0) return 0.5f
+        val step = max(1, minOf(w, h) / 24)
+        var sum = 0.0
+        var n = 0
+        var y = 0
+        while (y < h) {
+            var x = 0
+            while (x < w) {
+                val c = src.getPixel(x, y)
+                val a = ((c ushr 24) and 255) / 255f
+                val r = ((c shr 16) and 255) / 255f
+                val g = ((c shr 8) and 255) / 255f
+                val b = (c and 255) / 255f
+                sum += (0.2126 * r + 0.7152 * g + 0.0722 * b) * a
+                n++
+                x += step
+            }
+            y += step
+        }
+        return if (n == 0) 0.5f else (sum / n).toFloat().coerceIn(0f, 1f)
+    }
 
     private fun blurTo(src: Bitmap, sw: Int, r: Int, passes: Int, upscale: Boolean = true): Bitmap {
         var b = src

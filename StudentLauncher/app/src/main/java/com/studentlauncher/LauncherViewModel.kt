@@ -31,8 +31,11 @@ import androidx.compose.ui.geometry.Rect
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.calm.launcher.CalmConfig
+import com.calm.launcher.CalmSessionBridge
+import com.calm.launcher.CalmSlot
 import com.studentlauncher.data.*
-import com.studentlauncher.detox.DetoxPage
+import com.studentlauncher.detox.DetoxGuardService
 import com.studentlauncher.detox.DetoxPolicy
 import com.studentlauncher.detox.DetoxStore
 import com.studentlauncher.mindful.MindfulEngine
@@ -51,6 +54,12 @@ import com.studentlauncher.signals.SignalsMonitor
 import com.studentlauncher.signals.notificationAccessGranted
 import com.studentlauncher.signals.shouldReact
 import com.studentlauncher.ui.GlyphModes
+import com.studentlauncher.ui.GlyphTorch
+import com.studentlauncher.ui.decodeGlyphArt
+import com.studentlauncher.ui.encodeGlyphArt
+import com.studentlauncher.ui.LauncherMood
+import com.studentlauncher.ui.MOODS
+import com.studentlauncher.ui.moodPreset
 import com.studentlauncher.ui.rowSpanForFrameHeight
 import com.studentlauncher.ui.PinMode
 import com.studentlauncher.ui.PinRequest
@@ -68,11 +77,13 @@ import org.json.JSONObject
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import kotlin.math.abs
 
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx: Context = app.applicationContext
     private val repo = AppRepository(ctx)
     private val prefs = ctx.getSharedPreferences("student_launcher", Context.MODE_PRIVATE)
+    private val calmPrefs = ctx.getSharedPreferences(CalmConfig.PREFS, Context.MODE_PRIVATE)
     val hostMgr = WidgetHostManager(ctx)
 
     // ---- data ----
@@ -107,6 +118,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** One global clock style for every clock widget (no per-widget override). */
     var clockStyle by mutableStateOf(prefs.getString("clockStyle", "Dot") ?: "Dot"); private set
 
+    // ---- glyph matrix look: global defaults, overridable per widget ----
+    /** What the matrix settles into between events. Any catalog mode is accepted. */
+    var glyphAmbient by mutableStateOf(
+        prefs.getString("glyphAmbient", GlyphModes.CLOCK)?.takeIf { GlyphModes.meta(it) != null }
+            ?: GlyphModes.CLOCK
+    ); private set
+    var glyphDotScale by mutableStateOf(prefs.getFloat("glyphDotScale", 1f).coerceIn(0.5f, 1.4f)); private set
+    var glyphGlow by mutableStateOf(prefs.getBoolean("glyphGlow", false)); private set
+    var glyphCustomArt by mutableStateOf(prefs.getString("glyphCustomArt", "") ?: ""); private set
+
     // ---- torch reactions: opt-in, off by default, rate limited in code ----
     val torch = TorchController(ctx, viewModelScope)
     var torchEnabled by mutableStateOf(prefs.getBoolean("torchEnabled", false)); private set
@@ -139,8 +160,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 applyBattery(ctx.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
             }
         }
+        syncCalmLeave()
+        pinSet = pin.isSet
+        protectStudy = pin.protectStudyMode
         detoxHeartbeat()
         ensureDetoxLoop()
+        if (detox != null) {
+            // The guard keeps the deadline in the background; the loop only drives the in-app UI.
+            DetoxGuardService.start(ctx)
+            openCalm()
+        }
     }
 
     fun onActivityStop() {
@@ -232,13 +261,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * The ambient state the matrix falls back to when nothing is happening:
-     * charging > low battery > clock. All three render statically, so an idle matrix costs
-     * no frames at all.
+     * charging > low battery > the chosen resting mode. Every resting mode renders
+     * statically, so an idle matrix costs no frames at all.
      */
     private fun sustainedState(): String = when {
         batteryCharging -> GlyphModes.CHARGING
         batteryPct <= 15 -> GlyphModes.LOW
-        else -> GlyphModes.CLOCK
+        else -> glyphAmbient
     }
 
     private fun pushMatrixState(next: String) {
@@ -274,10 +303,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** A finished focus session: matrix check plus an optional two-flash torch. */
-    fun reactionDone() = fireReaction(GlyphModes.DONE, TorchPatterns.DONE)
+    fun reactionDone() = fireReaction(GlyphModes.DONE, GlyphTorch.pattern(GlyphModes.DONE))
 
     /** A priority / important signal: three-flash torch pattern at 2.5 Hz. */
-    fun reactionAlert() = fireReaction(GlyphModes.PULSE, TorchPatterns.ALERT)
+    fun reactionAlert() = fireReaction(GlyphModes.PULSE, GlyphTorch.pattern(GlyphModes.PULSE))
 
     // ---- Tier 0 signals: calls only, from AudioManager; no caller identity, no permissions ----
     var signalsEnabled by mutableStateOf(prefs.getBoolean("signalsEnabled", false)); private set
@@ -432,27 +461,82 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var protectStudy by mutableStateOf(pin.protectStudyMode); private set
     var pinRequest by mutableStateOf<PinRequest?>(null)
 
-    // ---- Detoxify (v6): a full Calm-style quiet mode, allow-listed, PIN-gated on the way out ----
+    // ---- Detoxify (v6): Calm's own home, ported unchanged, bounded by a session countdown ----
     private val detoxStore = DetoxStore(prefs)
     var detox by mutableStateOf<DetoxPolicy.Session?>(detoxStore.load()); private set
     var detoxLeft by mutableStateOf(initialDetoxLeft()); private set
-    /** Snapshot of the store value for UI; the store is authoritative. */
-    var detoxReleaseAt by mutableStateOf(detoxStore.releaseAt); private set
     var detoxBlocked by mutableStateOf<String?>(null); private set
     var detoxSummary by mutableStateOf<DetoxPolicy.Summary?>(DetoxPolicy.decodeSummary(detoxStore.summary)); private set
 
-    /** Calm-style start flow, before a session exists: open flag, step, and the draft choices. */
-    var detoxSetup by mutableStateOf(false); private set
-    var detoxSetupStep by mutableStateOf(0); private set
+    /** The start sheet: pick a length, then Calm takes over with a countdown. */
+    var detoxSheet by mutableStateOf(false); private set
     var detoxDraftLen by mutableStateOf(DetoxPolicy.DAY_MS); private set
-    var detoxDraftAllowed by mutableStateOf<Set<String>>(emptySet()); private set
-    /** Page inside a running session. */
-    var detoxPage by mutableStateOf(DetoxPage.Home); private set
 
     private var detoxJob: Job? = null
     private var detoxBeat = 0
+    private var calmLastOpen = 0L
 
-    /** Phone, camera and clock are never blocked. Resolved once from the system's own answers. */
+    // ---- Calm home config: shared with the Calm activity through the "calm" prefs file ----
+    /** 9 (short list) or 15 (adds six app slots) on Calm's home. */
+    var calmCount by mutableIntStateOf(CalmConfig.normalizeCount(calmPrefs.getString(CalmConfig.COUNT_KEY, "9")))
+        private set
+
+    /** Bumped whenever the config changes so Compose re-reads the chosen apps. */
+    var calmConfigVersion by mutableIntStateOf(0)
+        private set
+
+    fun reloadCalmConfig() {
+        calmCount = CalmConfig.normalizeCount(calmPrefs.getString(CalmConfig.COUNT_KEY, "9"))
+        calmConfigVersion++
+    }
+
+    fun setCalmAppCount(count: Int) {
+        calmCount = if (count == CalmConfig.COUNT_LARGE) CalmConfig.COUNT_LARGE else CalmConfig.COUNT_DEFAULT
+        calmPrefs.edit { putString(CalmConfig.COUNT_KEY, calmCount.toString()) }
+        calmConfigVersion++
+    }
+
+    fun calmSlots(): List<CalmSlot> = CalmConfig.slots(calmCount)
+
+    fun calmChoice(id: String): String = CalmConfig.readSlot(calmPrefs, id)
+
+    /** An empty package means "use the default app" for a default slot, or "empty" for an extra. */
+    fun setCalmChoice(id: String, pkg: String) {
+        val slot = calmSlots().firstOrNull { it.id == id }
+        val extra = slot != null && CalmConfig.isExtra(slot)
+        val changes = CalmConfig.readSlot(calmPrefs, id) != pkg
+        // Same rule as Calm's own settings (chooseApp): pointing a default row at another app is a
+        // loosening and waits 24 hours. Choosing the default again, or filling an extra slot,
+        // applies now.
+        val loosening = changes && !extra && pkg.isNotEmpty()
+        val scheduled = CalmConfig.writeSlot(calmPrefs, id, pkg, loosening)
+        if (scheduled) toast = "This change applies in 24 hours"
+        calmConfigVersion++
+    }
+
+    /** True while a loosening change for [id] is waiting out its 24 hours. */
+    fun calmChoicePending(id: String): Boolean = CalmConfig.slotChangePending(calmPrefs, id)
+
+    /** The app shown for a slot on the config page. Calm itself keeps the function label. */
+    fun calmSlotValue(slot: CalmSlot): String {
+        if (slot.id == "browser") return "built in"
+        if (slot.id == "phone" || slot.id == "camera") return "always"
+        val chosen = calmChoice(slot.id)
+        if (chosen.isNotEmpty()) return byPkg[chosen]?.label ?: chosen
+        if (CalmConfig.isExtra(slot)) return "empty"
+        val fallback = slot.pkgs.firstOrNull { byPkg.containsKey(it) }
+        return fallback?.let { byPkg[it]?.label } ?: "default"
+    }
+
+    /** Opens the Calm home page from the Detoxify sheet or Settings. */
+    fun openCalmConfig() {
+        reloadCalmConfig()
+        detoxSheet = false
+        settingsPage = SettingsPage.Calm
+        destination = InternalDestination.Settings
+    }
+
+    /** Phone, camera, clock, timer and calculator are never blocked. */
     val detoxAlways: Set<String> = resolveDetoxAlways()
 
     /** Remaining time right now, without waiting for the first heartbeat. */
@@ -460,26 +544,41 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         detox?.let { DetoxPolicy.remainingMs(it, SystemClock.elapsedRealtime(), System.currentTimeMillis()) } ?: 0L
 
     /**
-     * Phone/camera/clock packages: the system's resident handlers plus well-known vendor
-     * packages. Phone and camera also open through direct intents, so this list is mainly for
-     * showing them as always usable and for launching their packages. No new permissions.
+     * Phone/camera/clock/timer/calculator packages: the system's resident handlers plus the
+     * well-known vendor packages in [DetoxPolicy.alwaysPackages]. Phone and camera also open
+     * through direct intents, so this list is mainly for showing them as always usable and for
+     * launching their packages. No new permissions.
      */
     private fun resolveDetoxAlways(): Set<String> {
-        val out = HashSet<String>()
+        val out = HashSet(DetoxPolicy.alwaysPackages)
         val pm = ctx.packageManager
         fun add(i: Intent) {
             runCatching { pm.resolveActivity(i, 0)?.activityInfo?.packageName }.getOrNull()?.let { out.add(it) }
         }
         add(Intent(Intent.ACTION_DIAL))
         runCatching { add(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)) }
-        add(Intent(AlarmClock.ACTION_SHOW_ALARMS))
-        out.addAll(listOf(
-            "com.android.phone", "com.android.systemui",
-            "com.android.dialer", "com.google.android.dialer", "com.samsung.android.dialer",
-            "com.android.camera", "com.android.camera2", "com.google.android.GoogleCamera",
-            "com.sec.android.app.camera", "com.samsung.android.camera",
-            "com.android.deskclock", "com.google.android.deskclock", "com.sec.android.app.clockpackage"
-        ))
+        runCatching { add(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
+        runCatching { add(Intent(AlarmClock.ACTION_SHOW_TIMERS)) }
+        runCatching { add(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR)) }
+        return out
+    }
+
+    /**
+     * The apps the user put on Calm's home are allowed too, so a tap that reaches the normal
+     * launcher (for example after Calm is dismissed) does not show "not now" for them.
+     */
+    private fun calmAllowedPackages(): Set<String> {
+        val count = CalmConfig.normalizeCount(calmPrefs.getString(CalmConfig.COUNT_KEY, "9"))
+        val out = HashSet<String>()
+        CalmConfig.slots(count).forEach { slot ->
+            if (slot.id == "browser" || slot.id == "phone" || slot.id == "camera") return@forEach
+            val chosen = calmChoice(slot.id)
+            if (chosen.isNotEmpty()) {
+                out.add(chosen)
+            } else {
+                slot.pkgs.firstOrNull { ctx.packageManager.getLaunchIntentForPackage(it) != null }?.let { out.add(it) }
+            }
+        }
         return out
     }
 
@@ -492,54 +591,94 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ---- Calm-style start flow: length, apps, way out, ready ----
+    // ---- Detoxify start sheet: length, plus a shortcut to Calm's app list ----
 
-    /** Opens the start flow; during a session it just returns to the quiet home. */
-    fun openDetoxSetup() {
-        if (detox != null) { detoxPage = DetoxPage.Home; return }
-        detoxSetup = true
-        detoxSetupStep = 0
+    /** Opens the length sheet; during a session it just brings Calm back to the front. */
+    fun openDetoxSheet() {
+        if (detox != null) { openCalm(); return }
+        reloadCalmConfig()
+        detoxSheet = true
         detoxDraftLen = DetoxPolicy.DAY_MS
-        detoxDraftAllowed = emptySet()
     }
 
-    fun closeDetoxSetup() { detoxSetup = false }
-
-    fun detoxStep(step: Int) { detoxSetupStep = step.coerceIn(0, DetoxPolicy.SETUP_STEPS - 1) }
+    fun closeDetoxSheet() { detoxSheet = false }
 
     fun detoxDraftDuration(ms: Long) { detoxDraftLen = ms }
 
-    fun detoxDraftToggle(pkg: String) {
-        if (pkg in detoxAlways) return
-        detoxDraftAllowed = if (pkg in detoxDraftAllowed) detoxDraftAllowed - pkg else detoxDraftAllowed + pkg
+    /** Starts a session and hands the screen to Calm. The timer is the only way it ends by itself. */
+    fun detoxBegin() = requestDetoxStart()
+
+    /** The start sheet's button: the PIN comes first, then the session. */
+    fun requestDetoxStart() {
+        if (detox != null) { openCalm(); return }
+        detoxSheet = false
+        if (pinSet) {
+            pinRequest = PinRequest("Enter your PIN to start", PinMode.Verify) { startDetox(detoxDraftLen) }
+        } else {
+            pinRequest = PinRequest("Set a PIN for Detoxify", PinMode.Create) { startDetox(detoxDraftLen) }
+        }
     }
 
-    /** Starts from the last setup step. The PIN precondition is not optional. */
-    fun detoxBegin() {
-        if (!pinSet) { detoxSetupStep = 2; toast = "Set a PIN first"; return }
-        startDetox(detoxDraftLen, detoxDraftAllowed)
-    }
-
-    fun detoxSetPage(p: DetoxPage) { detoxPage = p }
-
-    /** Starts a session. [selected] is what the user ticked in the start flow. */
-    fun startDetox(lengthMs: Long, selected: Set<String>) {
+    fun startDetox(lengthMs: Long) {
         if (detox != null) return
+        if (!pinSet) { requestDetoxStart(); return }
         val nowMono = SystemClock.elapsedRealtime()
         val nowWall = System.currentTimeMillis()
-        val s = DetoxPolicy.Session(nowWall, lengthMs, DetoxPolicy.startAllowed(selected, detoxAlways), nowMono, lengthMs)
+        val s = DetoxPolicy.Session(
+            nowWall, lengthMs,
+            DetoxPolicy.startAllowed(calmAllowedPackages(), detoxAlways),
+            nowMono, lengthMs
+        )
         detox = s
         detoxLeft = lengthMs
-        detoxReleaseAt = 0L
-        detoxStore.releaseAt = 0L
         detoxBlocked = null
         detoxStore.summary = ""
         detoxSummary = null
-        detoxSetup = false
-        detoxPage = DetoxPage.Home
-        goHome()
-        toast = "Detoxify is on"
+        // A fresh session starts with no leave already in flight, and with no stale countdown
+        // left inside Calm: those prefs are what make a launch intent unambiguous.
+        CalmSessionBridge.clear(ctx)
+        calmPrefs.edit {
+            remove("leave_at")
+            remove("leave_mono")
+            remove("session_end_wall")
+            remove("session_end_mono")
+            remove("session_left")
+        }
+        detoxStore.save(s)
         ensureDetoxLoop()
+        DetoxGuardService.start(ctx)
+        openCalm()
+    }
+
+    // ---- Bridge to the ported Calm activity ----
+
+    /**
+     * Hands Calm the session deadline. Calm shows the countdown in place of the clock and finishes
+     * itself at zero, which brings the launcher back; the heartbeat here then ends the session.
+     */
+    private fun openCalm() {
+        val s = detox ?: return
+        val nowMono = SystemClock.elapsedRealtime()
+        val nowWall = System.currentTimeMillis()
+        val left = DetoxPolicy.remainingMs(s, nowMono, nowWall)
+        if (left <= 0L) { endDetox(endedByTimer = true); return }
+        // Collapse duplicate calls from the same frame; a real Home press is never this close.
+        if (nowMono - calmLastOpen < 250L) return
+        calmLastOpen = nowMono
+        val i = Intent()
+            .setClassName(ctx.packageName, CALM_ACTIVITY)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra("detox_session_id", s.startedWall)
+            .putExtra("detox_end_wall", s.startedWall + s.lengthMs)
+            .putExtra("detox_end_left", left)
+        runCatching { ctx.startActivity(i) }
+    }
+
+    /** Calm's leave flow ends the session here, before Calm finishes and the launcher comes back. */
+    private fun syncCalmLeave() {
+        if (!CalmSessionBridge.consumeLeft(ctx)) return
+        if (detox == null) return
+        endDetox(endedByTimer = false)
     }
 
     private fun ensureDetoxLoop() {
@@ -554,8 +693,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * One tick: catch the remaining time up, auto-end at zero, run an overdue early-exit wait.
-     * Anchors are persisted about every half minute, and again whenever the activity stops.
+     * One tick: catch the remaining time up and auto-end at zero. Anchors are persisted about
+     * every half minute, and again whenever the activity stops.
      */
     fun detoxHeartbeat() {
         val s = detox ?: return
@@ -563,9 +702,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val nowWall = System.currentTimeMillis()
         val left = DetoxPolicy.remainingMs(s, nowMono, nowWall)
         if (left <= 0L) { endDetox(endedByTimer = true); return }
-        if (DetoxPolicy.releaseDue(detoxReleaseAt, nowWall)) { endDetox(endedByTimer = false); return }
         detoxLeft = left
-        detoxReleaseAt = detoxStore.releaseAt
         if (++detoxBeat % 30 == 0) {
             val snap = DetoxPolicy.snapshot(s, nowMono, nowWall)
             detox = snap
@@ -578,18 +715,29 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val summary = DetoxPolicy.Summary(s.startedWall, s.lengthMs, s.allowed.size, endedByTimer)
         detox = null
         detoxLeft = 0L
-        detoxReleaseAt = 0L
         detoxBlocked = null
-        detoxPage = DetoxPage.Home
-        detoxSetup = false
+        detoxSheet = false
         detoxJob?.cancel()
         detoxJob = null
         detoxStore.clear()
+        // The leave signal and its wait belong to the session that just ended.
+        CalmSessionBridge.clear(ctx)
+        calmPrefs.edit {
+            remove("leave_at")
+            remove("leave_mono")
+        }
+        // Also drop any timer Calm is still holding, so a stale countdown cannot outlive the session.
+        calmPrefs.edit()
+            .remove("session_end_wall").remove("session_end_mono").remove("session_left").apply()
+        DetoxGuardService.stop(ctx)
         detoxStore.summary = DetoxPolicy.encodeSummary(summary)
         detoxSummary = summary
         toast = if (endedByTimer) "Detoxify complete" else "Detoxify ended"
         notifyDetoxDone(summary)
     }
+
+    // The early-exit PIN and its 10-minute wait live inside Calm, which owns the session screen.
+    // The launcher only reacts to the finished leave through CalmSessionBridge.
 
     /** Clears the block explanation once the sheet is dismissed. */
     fun clearDetoxBlock() { detoxBlocked = null }
@@ -597,34 +745,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissDetoxSummary() {
         detoxSummary = null
         detoxStore.summary = ""
-    }
-
-    // ---- Detoxify early exit: right PIN, then a 10-minute cooling-off ----
-
-    /** Opens the PIN pad (create if the PIN was removed mid-session), then starts the wait. */
-    fun requestDetoxEnd() {
-        if (detox == null) return
-        if (detoxReleaseAt != 0L) { toast = "The exit wait is already running"; return }
-        if (pinSet) {
-            pinRequest = PinRequest("Enter your PIN", PinMode.Verify) { beginDetoxRelease() }
-        } else {
-            pinRequest = PinRequest("Set a PIN to end early", PinMode.Create) { beginDetoxRelease() }
-        }
-    }
-
-    private fun beginDetoxRelease() {
-        if (detox == null) return
-        val at = System.currentTimeMillis() + DetoxPolicy.RELEASE_WAIT_MS
-        detoxReleaseAt = at
-        detoxStore.releaseAt = at
-        toast = "Detoxify ends in 10 minutes"
-    }
-
-    /** Withdraw the pending exit — the safe direction, so no PIN for cancelling. */
-    fun cancelDetoxRelease() {
-        detoxReleaseAt = 0L
-        detoxStore.releaseAt = 0L
-        toast = "Withdrawn — the session keeps running"
     }
 
     /** A quiet "back to normal" nudge; the notification permission is respected by wrapping. */
@@ -656,6 +776,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val DETOX_CHANNEL = "detox"
         const val DETOX_NOTIF_ID = 4343
+        /** The ported Calm home, declared in this app's manifest and started only from here. */
+        const val CALM_ACTIVITY = "com.calm.launcher.MainActivity"
     }
 
     // ---- Mindful engine (v4) ----
@@ -678,8 +800,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var widgetTab by mutableStateOf(0)
     var editWidgetId by mutableStateOf<String?>(null)
     var selectedWidgetId by mutableStateOf<String?>(null)
-    /** Root-space bottom of the selected widget's frame — Widgets() uses it to reveal a clipped corner. */
-    var frameBottomPx by mutableStateOf(0f)
+    /** Home grid cell a selected widget is resized from, so a drag does not make it jump rows. */
+    var widgetAnchorId by mutableStateOf<String?>(null)
+        private set
+    var widgetAnchorRow by mutableStateOf(0)
+        private set
+    var widgetAnchorCol by mutableStateOf(0)
+        private set
+    /** True while a corner drag is live; the reveal loop must not scroll under the finger. */
+    var widgetResizing by mutableStateOf(false)
+    /** Root-space frame of each Home tile — Widgets() reveals the selected one. */
+    val widgetFrames = mutableStateMapOf<String, Rect>()
     /** Session-only: one resize-hint toast per app run, not persisted. */
     var resizeHintShown = false
     var wallpaperEditor by mutableStateOf(false)
@@ -687,6 +818,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var arrangingApps by mutableStateOf(false)
     var aboutOpen by mutableStateOf(false)
     var activeBrainTask by mutableStateOf<String?>(null)
+
     val planTasks = mutableStateListOf<PlanTask>().apply { addAll(parsePlanTasks(prefs.getString("plan_tasks", "") ?: "")) }
     val planEvents = mutableStateListOf<PlanEvent>().apply { addAll(parsePlanEvents(prefs.getString("plan_events", "") ?: "")) }
 
@@ -695,6 +827,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
         refreshMotionScale()
         refreshShuffleSlot()
+        // Calm ends the leave flow in-process so the session is already gone when the launcher
+        // comes back; the prefs flag inside the bridge covers a cold start.
+        CalmSessionBridge.listen { syncCalmLeave() }
         viewModelScope.launch(Dispatchers.IO) {
             Wallpapers.seedPreloads(ctx)
             if (shuffleCount == 0) {
@@ -702,6 +837,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 if (sc > 0) withContext(Dispatchers.Main) { applyShuffleCount(sc) }
             }
         }
+    }
+
+    override fun onCleared() {
+        CalmSessionBridge.listen(null)
+        super.onCleared()
     }
 
     // ---- loading ----
@@ -755,6 +895,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         it.pkg !in pinned && isVisible(it) && (chip != Chip.Study || it.pkg in studyApps)
     }
 
+    /**
+     * Search intentionally sees every visible app, including the ones already on Home or in the
+     * Dock. The A–Z list still omits Home apps; the two lists answer different questions.
+     */
+    private fun searchPool(): List<AppInfo> = apps.filter {
+        isVisible(it) && (chip != Chip.Study || it.pkg in studyApps)
+    }
+
+    fun placementNote(pkg: String): String? = when {
+        pkg in pinned -> "on home"
+        pkg in dock -> "in dock"
+        else -> null
+    }
+
     fun availableLetters(): Set<Char> = pool().map { letterOf(it.label) }.toSet()
 
     fun groupedApps(): List<Pair<Char, List<AppInfo>>> =
@@ -762,7 +916,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun appsForKey(key: String): List<AppInfo> {
         val q = query.trim().lowercase()
-        return if (key == "q") pool().filter { it.label.lowercase().contains(q) }
+        return if (key == "q") searchPool().filter { it.label.lowercase().contains(q) }
         else pool().filter { letterOf(it.label) == key[0] }
     }
 
@@ -797,6 +951,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         wallpaperEditor = false
         pickHomeApps = false
         selectedWidgetId = null
+        arrangingApps = false
         activeBrainTask = null
         destination = InternalDestination.Home
         settingsPage = SettingsPage.Root
@@ -805,13 +960,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         mindful.appLimitsOpen = false
         pinRequest = null
         refreshShuffleSlot()
+        // A leave that finished while the launcher was in the background wins over re-opening Calm.
+        syncCalmLeave()
+        // A running session owns the home button: the launcher comes forward, Calm goes back on top.
+        if (detox != null) openCalm()
     }
 
     fun back() {
         when {
-            settingsPage != SettingsPage.Root -> settingsPage = SettingsPage.Root
+            settingsPage != SettingsPage.Root -> settingsPage = when (settingsPage) {
+                SettingsPage.Icons, SettingsPage.Theme, SettingsPage.Wallpaper,
+                SettingsPage.Home, SettingsPage.Clock, SettingsPage.Glyph -> SettingsPage.Personalization
+                else -> SettingsPage.Root
+            }
             wallpaperEditor -> wallpaperEditor = false
             pickHomeApps -> pickHomeApps = false
+            arrangingApps -> arrangingApps = false
             aboutOpen -> aboutOpen = false
             editWidgetId != null -> editWidgetId = null
             widgetCenter -> widgetCenter = false
@@ -851,6 +1015,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (pkg in dock) dock.remove(pkg)
         else if (dock.size >= 5) toast = "Dock holds 5 apps"
         else dock.add(pkg)
+        saveCsv("dock", dock)
+    }
+
+    /** Drag-rearrange: move [dragged] next to [target] in dock order (display order mirrors dock). */
+    fun moveDock(dragged: String, target: String, after: Boolean) {
+        val from = dock.indexOf(dragged)
+        if (from < 0) return
+        dock.removeAt(from)
+        val to = dock.indexOf(target)
+        if (to < 0) dock.add(if (after) dock.size else 0, dragged)
+        else dock.add(if (after) to + 1 else to, dragged)
         saveCsv("dock", dock)
     }
 
@@ -992,12 +1167,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun applyEarnScroll(v: Boolean) { earnScrollEnabled = v; putB("earn_scroll_enabled", v) }
     fun applyDailyBudget(v: Int) { dailyBudgetMin = v; prefs.edit().putInt("daily_budget_min", v).apply() }
 
-    fun openAppInfo(pkg: String) {
-        val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ctx.startActivity(i)
-    }
-
     // ---- widgets ----
     private fun saveHomeWidgets() = putS("home_widgets_v2", homeWidgets.toList().toJson())
     private fun saveBoardWidgets() = putS("board_widgets_v2", boardWidgets.toList().toJson())
@@ -1049,6 +1218,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         list.removeAt(index)
         if (editWidgetId == id) editWidgetId = null
         if (selectedWidgetId == id) selectedWidgetId = null
+        widgetFrames.remove(id)
+        clearWidgetAnchor()
         if (isHome) saveHomeWidgets() else saveBoardWidgets()
 
         widgetUndo.stage(w, index, if (isHome) "home" else "board", System.currentTimeMillis())
@@ -1143,6 +1314,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun moveWidget(id: String, delta: Int) {
+        clearWidgetAnchor()
         val inHome = homeWidgets.indexOfFirst { it.id == id }
         val list: MutableList<WidgetItem>
         val i: Int
@@ -1161,6 +1333,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun reorderBoardWidget(from: Int, to: Int) {
+        clearWidgetAnchor()
         if (from !in boardWidgets.indices || to !in boardWidgets.indices || from == to) return
         val w = boardWidgets.removeAt(from)
         boardWidgets.add(to, w)
@@ -1173,6 +1346,27 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setWidgetColSpan(id: String, span: Int) {
         updateWidget(id) { it.copy(colSpan = clampWidgetColSpan(span)) }
+    }
+
+    /** One commit for a corner drag: both axes change together, so only one save/recompose. */
+    fun resizeWidget(id: String, colSpan: Int, rowSpan: Int) {
+        updateWidget(id) {
+            it.copy(
+                colSpan = clampWidgetColSpan(colSpan),
+                rowSpan = clampWidgetRowSpan(rowSpan)
+            )
+        }
+    }
+
+    /** Remember the grid cell a resize started from so the tile stays put for the whole drag. */
+    fun anchorWidget(id: String, row: Int, col: Int) {
+        widgetAnchorId = id
+        widgetAnchorRow = row.coerceAtLeast(0)
+        widgetAnchorCol = col.coerceAtLeast(0)
+    }
+
+    fun clearWidgetAnchor() {
+        widgetAnchorId = null
     }
 
     /** Reports the composed size so hosted providers can pick their own layout. */
@@ -1376,6 +1570,98 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun applyWpAccent(v: Boolean) { wpAccent = v; putB("wpAccent", v) }
     fun applyUiFont(f: String) { uiFont = f; putS("uiFont", f) }
     fun applyClockStyle(s: String) { clockStyle = s; putS("clockStyle", s) }
+
+    // ---- glyph matrix ----
+    fun applyGlyphAmbient(mode: String) {
+        val safe = if (GlyphModes.meta(mode) != null) mode else GlyphModes.CLOCK
+        glyphAmbient = safe
+        putS("glyphAmbient", safe)
+        recomputeMatrixState()
+    }
+
+    fun applyGlyphDotScale(v: Float) {
+        glyphDotScale = v.coerceIn(0.5f, 1.4f)
+        prefs.edit().putFloat("glyphDotScale", glyphDotScale).apply()
+    }
+
+    fun applyGlyphGlow(v: Boolean) {
+        glyphGlow = v
+        putB("glyphGlow", v)
+    }
+
+    /** Stores a 25 x 25 custom drawing; anything malformed becomes an empty canvas. */
+    fun applyGlyphCustomArt(raw: String) {
+        val safe = encodeGlyphArt(decodeGlyphArt(raw))
+        glyphCustomArt = safe
+        putS("glyphCustomArt", safe)
+    }
+
+    fun glyphCustomCells(): Set<Int> = decodeGlyphArt(glyphCustomArt)
+
+    /** Study-timer progress for the Focus ambient. 0 when no timer widget is running. */
+    fun glyphFocusProgress(nowMs: Long = System.currentTimeMillis()): Float {
+        val timer = (homeWidgets + boardWidgets).firstOrNull { it.type == WT.TIMER } ?: return 0f
+        val start = timer.get("start", "0").toLongOrNull() ?: 0L
+        if (start <= 0L) return 0f
+        val total = (timer.get("min", "25").toIntOrNull() ?: 25) * 60_000L
+        if (total <= 0L) return 0f
+        return ((nowMs - start).toFloat() / total).coerceIn(0f, 1f)
+    }
+
+    /** Completed-task fraction for the Task ambient, from a task widget or the Plan. */
+    fun glyphTaskProgress(): Float {
+        val widget = (homeWidgets + boardWidgets).firstOrNull { it.type == WT.TASKS }
+        if (widget != null) {
+            val tasks = parseTasks(widget.get("items"))
+            if (tasks.isNotEmpty()) return tasks.count { it.first }.toFloat() / tasks.size
+        }
+        if (planTasks.isEmpty()) return 0f
+        return planTasks.count { it.completed }.toFloat() / planTasks.size
+    }
+
+    /** The mood whose look matches every setting, or null when the user has customised it. */
+    fun currentMood(): LauncherMood? = MOODS.firstOrNull { mood ->
+        val p = moodPreset(mood)
+        themeMode == p.theme &&
+            accentId == p.accentId &&
+            iconPack == p.iconPack &&
+            iconShape == p.iconShape &&
+            (wallpaper == "photo" || wallpaper == "shuffle" || wallpaper == p.wallpaper) &&
+            layout == p.layout &&
+            dockStyle == p.dockStyle &&
+            showNames == p.showNames &&
+            homeColumns == p.homeColumns &&
+            abs(motionIntensity - p.motion) < 0.01f &&
+            compactDensity == p.compactDensity &&
+            uiFont == p.uiFont &&
+            glyphAmbient == p.glyphAmbient &&
+            abs(glyphDotScale - p.glyphDotScale) < 0.01f &&
+            glyphGlow == p.glyphGlow
+    }
+
+    /**
+     * Applies a complete look. Personal data is untouched: pinned apps, dock apps, tasks,
+     * widgets, study flags and a user photo or shuffle wallpaper all stay exactly as they are.
+     */
+    fun applyMood(mood: LauncherMood) {
+        val p = moodPreset(mood)
+        applyTheme(p.theme)
+        applyAccent(p.accentId)
+        applyIconPack(p.iconPack)
+        applyIconShape(p.iconShape)
+        if (wallpaper != "photo" && wallpaper != "shuffle") applyWallpaper(p.wallpaper)
+        applyLayout(p.layout)
+        applyDockStyle(p.dockStyle)
+        applyShowNames(p.showNames)
+        applyHomeColumns(p.homeColumns)
+        applyMotionIntensity(p.motion)
+        applyCompactDensity(p.compactDensity)
+        applyUiFont(p.uiFont)
+        applyGlyphAmbient(p.glyphAmbient)
+        applyGlyphDotScale(p.glyphDotScale)
+        applyGlyphGlow(p.glyphGlow)
+        toast = "${mood.label} applied"
+    }
     fun effectiveMotion(): Float =
         if (sysAnimScale == 0f) 0f else (motionIntensity * sysAnimScale).coerceIn(0f, 1f)
 

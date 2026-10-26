@@ -17,10 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.studentlauncher.LauncherViewModel
@@ -30,7 +33,15 @@ import kotlin.math.roundToInt
 
 /** A regular Android app widget (weather, calendar, ...) hosted inside a glass frame. */
 @Composable
-fun HostedWidget(vm: LauncherViewModel, item: WidgetItem, compact: Boolean, modifier: Modifier = Modifier) {
+fun HostedWidget(
+    vm: LauncherViewModel,
+    item: WidgetItem,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+    cellWidth: Dp? = null,
+    gridRow: Int? = null,
+    gridCol: Int? = null
+) {
     val appId = item.get("appWidgetId").toIntOrNull() ?: return
     val info = remember(appId) { vm.hostMgr.info(appId) } ?: return
     val c = LocalColors.current
@@ -38,7 +49,10 @@ fun HostedWidget(vm: LauncherViewModel, item: WidgetItem, compact: Boolean, modi
     val selected = vm.selectedWidgetId == item.id
     val settingsCd = stringResource(R.string.widget_settings)
     val h = widgetFrameHeight(item.rowSpan, compact)
-    Box(modifier.fillMaxWidth().height(h).glass(26.dp).clip(RoundedCornerShape(26.dp))) {
+    Box(
+        modifier.fillMaxWidth().height(h).glass(20.dp).clip(RoundedCornerShape(20.dp))
+            .onGloballyPositioned { vm.widgetFrames[item.id] = it.boundsInRoot() }
+    ) {
         AndroidView(
             factory = { ctx -> vm.hostMgr.host.createView(ctx, appId, info) },
             modifier = Modifier.fillMaxSize().onSizeChanged { size ->
@@ -52,12 +66,17 @@ fun HostedWidget(vm: LauncherViewModel, item: WidgetItem, compact: Boolean, modi
         if (selected) {
             Box(
                 Modifier.matchParentSize()
-                    .border(1.dp, c.accent.copy(alpha = 0.6f), RoundedCornerShape(26.dp))
+                    .border(1.5.dp, c.accent.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
             )
+            WidgetRemoveBadge(onClick = { vm.removeWidget(item.id) }, modifier = Modifier.align(Alignment.TopStart))
             WidgetResizeHandle(
                 w = item,
                 vm = vm,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
+                compact = compact,
+                cellWidth = cellWidth,
+                gridRow = gridRow,
+                gridCol = gridCol,
+                modifier = Modifier.align(Alignment.BottomEnd)
             )
         }
         // Android widgets swallow touches, so settings live behind this small handle.

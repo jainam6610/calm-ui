@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.studentlauncher.LauncherViewModel
+import com.studentlauncher.data.InternalDestination
+import com.studentlauncher.data.SettingsPage
 import com.studentlauncher.data.WIDGET_COLUMNS
 import com.studentlauncher.data.WT
 import com.studentlauncher.data.WidgetBg
@@ -144,28 +146,18 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
         Txt(WT.title(w.type), 18f, c.fg, FontWeight.Medium)
 
         if (w.type == WT.ANDROID) {
-            SLabel("Height")
-            Segmented(
-                listOf(1 to "Small", 2 to "Medium", 3 to "Tall", 4 to "Extra tall"),
-                w.rowSpan, { v -> vm.setWidgetRowSpan(id, v) }
-            )
+            SLabel("Height · rows")
+            Segmented(widgetRowSpanChoices(), w.rowSpan, { v -> vm.setWidgetRowSpan(id, v) })
         } else {
             SLabel("Background")
             Segmented(
                 listOf(WidgetBg.Glass to "Glass", WidgetBg.Solid to "Solid", WidgetBg.None to "None", WidgetBg.Frosted to "Frosted"),
                 w.bg, { v -> vm.updateWidget(id) { it.copy(bg = v) } }
             )
-            SLabel("Height")
-            Segmented(
-                listOf(1 to "Small", 2 to "Medium", 3 to "Tall", 4 to "Extra tall"),
-                w.rowSpan, { v -> vm.setWidgetRowSpan(id, v) }
-            )
-            SLabel("Width")
-            Segmented(
-                listOf(WIDGET_COLUMNS to "Full", 2 to "Half"),
-                if (w.colSpan <= 2) 2 else WIDGET_COLUMNS,
-                { v -> vm.setWidgetColSpan(id, v) }
-            )
+            SLabel("Height · rows")
+            Segmented(widgetRowSpanChoices(), w.rowSpan, { v -> vm.setWidgetRowSpan(id, v) })
+            SLabel("Width · columns")
+            Segmented(widgetColSpanChoices(), w.colSpan, { v -> vm.setWidgetColSpan(id, v) })
             SLabel("Text color")
             Segmented(
                 listOf("auto" to "Auto", "light" to "Light", "dark" to "Dark", "red" to "Red", "blue" to "Blue", "green" to "Green", "purple" to "Purple"),
@@ -219,7 +211,7 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                         w.get("dateFmt", "EEE, d MMM"), { vm.setCfg(id, "dateFmt", it) }
                     )
                 }
-                SwitchLine("Quote line", w.get("quote", "1") == "1") { vm.setCfg(id, "quote", if (it) "1" else "0") }
+                SwitchLine("Quote line", w.get("quote", "0") == "1") { vm.setCfg(id, "quote", if (it) "1" else "0") }
             }
             WT.NEXT -> {
                 SLabel("Title")
@@ -257,13 +249,54 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
                 Segmented(listOf("1" to "Monday", "0" to "Sunday"), w.get("mon", "1"), { vm.setCfg(id, "mon", it) })
             }
             WT.GLYPH -> {
+                SLabel("Resting mode")
                 Txt(
-                    "This display follows your phone: it shows the clock, switches to the charging ring while plugged in, and reacts when a signal arrives.",
+                    "Global follows Personalisation. A per-widget mode only changes what rests here; signal reactions still play.",
                     12f,
                     LocalColors.current.fg2,
-                    modifier = Modifier.padding(top = 14.dp),
                     maxLines = 3
                 )
+                Spacer(Modifier.height(6.dp))
+                val ambient = listOf(
+                    "" to "Global",
+                    GlyphModes.CLOCK to "Clock",
+                    GlyphModes.QUIET to "Quiet",
+                    GlyphModes.FOCUS to "Focus",
+                    GlyphModes.TASKS to "Tasks",
+                    GlyphModes.OFF to "Off"
+                )
+                ambient.chunked(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { (mode, label) ->
+                            ChoiceChip(
+                                label,
+                                w.get("ambient") == mode,
+                                { vm.setCfg(id, "ambient", mode) },
+                                Modifier.weight(1f)
+                            )
+                        }
+                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                SLabel("Dot size")
+                Segmented(
+                    listOf("" to "Global", "0.8" to "Small", "1" to "Medium", "1.12" to "Large"),
+                    w.get("dot"),
+                    { vm.setCfg(id, "dot", it) }
+                )
+                SLabel("Accent glow")
+                Segmented(
+                    listOf("" to "Global", "0" to "Off", "1" to "On"),
+                    w.get("glow"),
+                    { vm.setCfg(id, "glow", it) }
+                )
+                Spacer(Modifier.height(8.dp))
+                PillButton("Open Glyph Studio", {
+                    vm.editWidgetId = null
+                    vm.settingsPage = SettingsPage.Glyph
+                    vm.destination = InternalDestination.Settings
+                })
             }
             WT.QUOTES -> {
                 SLabel("Show")
@@ -290,26 +323,26 @@ fun AboutSheet(vm: LauncherViewModel) {
     val c = LocalColors.current
     val ctx = LocalContext.current
     val version = remember {
-        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "3.0"
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "3.2"
     }
     BottomSheet({ vm.aboutOpen = false }, 0.6f) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp).clip(CircleShape).background(c.accent))
             Spacer(Modifier.width(10.dp))
-            Txt("Student Launcher", 18f, c.fg, FontWeight.Medium)
+            Txt("Calm UI", 18f, c.fg, FontWeight.Medium)
         }
         Txt("Version $version", 12f, c.fg2, modifier = Modifier.padding(top = 4.dp))
         Spacer(Modifier.height(16.dp))
         Txt("Developed by thats.jainam", 15f, c.fg)
         Spacer(Modifier.height(8.dp))
         Txt(
-            "A calm launcher for students. Everything stays on your phone: no accounts, no ads, no tracking.",
+            "A quieter home screen for anyone who wants one. Everything stays on your phone: no accounts, no ads, no tracking.",
             13f, c.fg2, maxLines = 4
         )
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PillButton("Privacy Policy", {
-                ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://jainam662010-boop.github.io/StudentLauncher/privacy.html")))
+                ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://jainam6610.github.io/calm-ui/")))
             })
             PillButton("Close", { vm.aboutOpen = false }, filled = true)
         }

@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -140,7 +141,7 @@ fun LauncherRoot(
             val slot = vm.shuffleSlot
             set = withContext(Dispatchers.Default) { Wallpapers.build(ctx, id, dark, wPx, hPx, adj, slot) }
         }
-        val env = remember(set, dark) { GlassEnv(set?.blurred, dark, wPx) }
+        val env = remember(set, dark) { GlassEnv(set?.blurred, dark, wPx, set?.lum ?: 0.5f) }
         val accent = if (vm.wpAccent && set != null) {
             remember(set, vm.wpAccent) {
                 Wallpapers.dominantColor(set!!.blurred.asAndroidBitmap())
@@ -162,10 +163,8 @@ fun LauncherRoot(
             }
             when {
                 !vm.onboardingComplete -> OnboardingFlow(vm)
-                vm.detoxSetup -> DetoxSetup(vm)
                 vm.destination == InternalDestination.Plan -> PlanApp(vm)
                 vm.destination == InternalDestination.Settings -> SettingsApp(vm, pickPhoto, pickShufflePhotos, askNotifications)
-                vm.detox != null -> DetoxMode(vm)
                 else -> HomeLayer(vm, pickPhoto, addWidget, askNotifications, maxWidth, maxHeight)
             }
             SharedSheets(vm, addWidget)
@@ -187,6 +186,7 @@ private fun SharedSheets(vm: LauncherViewModel, addWidget: (AppWidgetProviderInf
     if (vm.mindful.settingsOpen) MindfulSettingsSheet(vm.mindful)
     if (vm.mindful.appLimitsOpen) AppLimitsSheet(vm)
     if (vm.pickHomeApps) HomeAppPicker(vm)
+    if (vm.detoxSheet) DetoxStartSheet(vm)
     if (vm.detoxBlocked != null) DetoxBlockSheet(vm)
     if (vm.detoxSummary != null) DetoxSummarySheet(vm)
 }
@@ -203,7 +203,12 @@ private fun HomeAppPicker(vm: LauncherViewModel) {
             PillButton("Done", { vm.pickHomeApps = false }, filled = true)
         }
         Spacer(Modifier.height(8.dp))
-        Txt("Tap to pin or unpin. Home holds up to your limit.", 12f, c.fg2, maxLines = 2)
+        val full = vm.pinned.size >= vm.homeAppLimit
+        Txt(
+            if (full) "Home is full. Unpin one to add another."
+            else "Tap to pin or unpin. Home holds up to your limit.",
+            12f, if (full) c.fg else c.fg2, maxLines = 2
+        )
         Spacer(Modifier.height(6.dp))
         vm.apps.forEach { app ->
             val on = app.pkg in vm.pinned
@@ -217,7 +222,7 @@ private fun HomeAppPicker(vm: LauncherViewModel) {
                 AppIconView(app, vm, 36.dp)
                 Spacer(Modifier.width(12.dp))
                 Txt(app.label, 15f, c.fg, modifier = Modifier.weight(1f))
-                if (on) Txt("on home", 11f, c.accent)
+                if (on) Txt("on home", 11f, c.fg2)
             }
         }
     }
@@ -267,6 +272,7 @@ fun HomeLayer(
     BackHandler {
         when {
             homeMenu -> homeMenu = false
+            vm.arrangingApps -> vm.arrangingApps = false
             pagerState.currentPage == 1 -> scope.launch { pagerState.animateScrollToPage(0) }
             else -> vm.back()
         }
@@ -340,6 +346,30 @@ fun HomeLayer(
 
         QuietHomeHeader(vm, pagerState, Modifier.align(Alignment.TopCenter).statusBarsPadding())
 
+        // ponytail: one Arrange bar for Home and the board, anchored over the dock so it
+        // never covers the widget windows' bottom edge (corner resize handles live there).
+        val arrangeSel = vm.selectedWidgetId
+        val arrangeOnPage = when {
+            arrangeSel == null -> false
+            vm.homeWidgets.any { it.id == arrangeSel } -> pagerState.currentPage == 0
+            vm.boardWidgets.any { it.id == arrangeSel } -> pagerState.currentPage == 1
+            else -> false
+        }
+        ArrangeBar(
+            vm, arrangeOnPage,
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp)
+        )
+
+        // The board page has no in-page Done pill, so arrange mode gets one here above the dock.
+        if (vm.arrangingApps && pagerState.currentPage == 1) {
+            PillButton(
+                "Done",
+                { vm.arrangingApps = false },
+                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 92.dp),
+                filled = true
+            )
+        }
+
         val ca = vm.ctxApp
         if (ca != null) {
             Scrim { vm.ctxApp = null }
@@ -409,16 +439,12 @@ fun HomeLayer(
 
 @Composable
 private fun QuietHomeHeader(vm: LauncherViewModel, pagerState: PagerState, modifier: Modifier = Modifier) {
-    val c = LocalColors.current
-    val now = rememberNow()
-    val is24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
+    // The clock lives in the user's own clock widget; a second fixed clock here read as a
+    // duplicate above it. Header keeps only the page dots and the Plan shortcut.
     Row(modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Txt(now.format(java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM")).uppercase(), 11f, c.fg2, FontWeight.Bold)
-            Txt(now.format(java.time.format.DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")), 25f, c.fg, FontWeight.SemiBold)
-        }
+        Spacer(Modifier.weight(1f))
         PagerDots(pagerState)
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
         PillButton("Plan", { vm.destination = InternalDestination.Plan })
     }
 }
@@ -441,7 +467,7 @@ private fun PagerDots(pagerState: PagerState) {
                 Modifier
                     .size(if (i == page) 16.dp else 6.dp, 6.dp)
                     .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(if (i == page) c.accent else c.fg2.copy(alpha = 0.35f))
+                    .background(if (i == page) c.fg else c.fg2.copy(alpha = 0.35f))
             )
         }
     }
@@ -458,17 +484,23 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
     val motion = LocalMotionScale.current
     val dens = LocalDensity.current
     val scope = rememberCoroutineScope()
+    val open = vm.view == ViewMode.All
     val openAll = stringResource(R.string.open_all_apps)
+    val showHome = stringResource(R.string.show_home)
+    val label = if (open) showHome else openAll
     Box(
         Modifier
             .fillMaxWidth()
             .height(48.dp)
             .semantics {
-                contentDescription = openAll
+                contentDescription = label
                 role = Role.Button
-                onClick(openAll) { vm.view = ViewMode.All; true }
+                onClick(label) {
+                    if (open) vm.goHome() else vm.view = ViewMode.All
+                    true
+                }
             }
-            .pointerInput(prog, motion) {
+            .pointerInput(prog, motion, open) {
                 val distance = with(dens) { 180.dp.toPx() }
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -487,16 +519,23 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
                                 return@awaitEachGesture // horizontal: the Home pager owns it
                             }
                             if (drawerGestureOwns(dx, dy, viewConfiguration.touchSlop)) {
+                                if (open) return@awaitEachGesture // already open; up does nothing
                                 claimed = true
                                 ch.consume()
                             } else if (dy > viewConfiguration.touchSlop) {
-                                return@awaitEachGesture // downward: leave it to the content
+                                if (!open) return@awaitEachGesture // downward: leave it to the content
+                                claimed = true // drag down to close
+                                ch.consume()
                             }
                         }
                         if (claimed) {
                             lastDy = dy
                             if (motion >= 0.05f) {
-                                val target = drawerProgress(dy, distance)
+                                val target = if (open) {
+                                    1f - (dy / distance).coerceIn(0f, 1f)
+                                } else {
+                                    drawerProgress(dy, distance)
+                                }
                                 // The pointer scope is restricted; move the shared panel
                                 // Animatable on the composition scope instead.
                                 scope.launch { prog.snapTo(target) }
@@ -507,7 +546,16 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
                     if (claimed) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         val velocity = tracker.calculateVelocity().y
-                        if (drawerShouldOpen(drawerProgress(lastDy, distance), velocity)) {
+                        if (open) {
+                            val fraction = (lastDy / distance).coerceIn(0f, 1f)
+                            if (fraction >= DRAWER_OPEN_FRACTION ||
+                                (fraction > 0.05f && velocity > DRAWER_FLING_VELOCITY)
+                            ) {
+                                vm.goHome()
+                            } else {
+                                scope.launch { prog.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 320f)) }
+                            }
+                        } else if (drawerShouldOpen(drawerProgress(lastDy, distance), velocity)) {
                             vm.view = ViewMode.All
                         } else {
                             scope.launch {
@@ -516,9 +564,9 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
                             }
                         }
                     } else if (abs(lastDy) < viewConfiguration.touchSlop) {
-                        // A plain tap on the affordance also opens the panel.
+                        // A plain tap toggles the panel, so the handle is also the way out.
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        vm.view = ViewMode.All
+                        if (open) vm.goHome() else vm.view = ViewMode.All
                     }
                 }
             },
@@ -526,14 +574,13 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
     ) {
         Row(
             Modifier
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
-                .background(c.track.copy(alpha = 0.55f))
+                .glass(15.dp, GlassLevel.Chrome)
                 .padding(horizontal = 14.dp, vertical = 5.dp),
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Txt(stringResource(R.string.apps), 10f, c.fg2, FontWeight.Medium)
-            Txt("\u2191", 11f, c.fg2, FontWeight.Medium)
+            Txt(if (open) stringResource(R.string.home) else stringResource(R.string.apps), 10f, c.fg2, FontWeight.Medium)
+            Txt(if (open) "\u2193" else "\u2191", 11f, c.fg2, FontWeight.Medium)
         }
     }
 }
@@ -542,7 +589,7 @@ private fun AppsHandle(vm: LauncherViewModel, prog: Animatable<Float, *>) {
 private fun UndoPill(label: String, onUndo: () -> Unit) {
     val c = LocalColors.current
     Row(
-        Modifier.glass(24.dp)
+        Modifier.glass(24.dp, GlassLevel.Chrome)
             .semantics { liveRegion = LiveRegionMode.Polite }
             .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -678,11 +725,14 @@ private fun HomePageContent(
         }
 
         if (showPanel) {
+            // While the IME is up, let the panel use the whole page before imePadding trims the
+            // bottom; otherwise the fraction + keyboard inset can squeeze the results to zero.
+            val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
             AllAppsPanel(
                 vm,
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxHeight(if (compact) 0.92f else 0.74f)
+                    .fillMaxHeight(if (imeOpen) 1f else if (compact) 0.92f else 0.74f)
                     .graphicsLayer {
                         val p = prog.value
                         alpha = p
