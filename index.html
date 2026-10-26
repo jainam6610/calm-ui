@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Calm UI — a quiet, open-source Android launcher for anyone who wants one. No ads, no accounts, no tracking.">
+    <meta name="theme-color" content="#08080a">
+    <meta property="og:title" content="Calm UI">
+    <meta property="og:description" content="A quiet, open-source Android launcher. No ads, no accounts, no tracking.">
+    <meta property="og:type" content="website">
+    <title>Calm UI — a quieter home screen</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { color-scheme: dark; --fg: #f5f5f7; --muted: #9a9aa2; --line: rgba(255,255,255,.10); --card: rgba(255,255,255,.045); --lime: #d8ff3e; }
+        body {
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 2.5rem 1.25rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: var(--fg);
+            background:
+                radial-gradient(900px 520px at 15% -10%, rgba(216,255,62,.10), transparent 60%),
+                radial-gradient(800px 500px at 100% 15%, rgba(120,140,255,.10), transparent 55%),
+                #08080a;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+        .card {
+            width: 100%; max-width: 680px;
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background: var(--card);
+            padding: clamp(1.6rem, 5vw, 3rem);
+            backdrop-filter: blur(14px);
+        }
+        .eyebrow { font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+        h1 { font-size: clamp(2rem, 6vw, 3rem); font-weight: 300; letter-spacing: -.02em; margin: .5rem 0 .75rem; }
+        h1 strong { font-weight: 600; }
+        .lede { font-size: 1.02rem; color: var(--muted); max-width: 46ch; }
+        .lede strong { color: var(--fg); font-weight: 500; }
+        .actions { display: flex; flex-wrap: wrap; gap: .7rem; margin: 1.8rem 0 2rem; }
+        .btn {
+            display: inline-flex; align-items: center; gap: .55rem;
+            min-height: 48px; padding: .8rem 1.35rem;
+            border-radius: 999px; border: 1px solid var(--line);
+            color: var(--fg); text-decoration: none; font-size: .95rem; font-weight: 500;
+            transition: transform .18s ease, background .18s ease, border-color .18s ease;
+        }
+        .btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.06); }
+        .btn:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+        .btn.primary { background: var(--lime); border-color: var(--lime); color: #0b0b0c; }
+        .btn.primary:hover { background: #e4ff77; border-color: #e4ff77; }
+        .btn svg { width: 18px; height: 18px; fill: currentColor; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1.1rem; margin-top: 2rem; padding-top: 1.75rem; border-top: 1px solid var(--line); }
+        .item h2 { font-size: .92rem; font-weight: 600; margin-bottom: .25rem; }
+        .item p { font-size: .86rem; color: var(--muted); }
+        footer { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--line); font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: .4rem 1rem; }
+        footer a { color: var(--fg); text-decoration: none; border-bottom: 1px solid transparent; }
+        footer a:hover { border-color: var(--muted); }
+        .dot { opacity: .45; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="eyebrow">Android · Open source · MIT</p>
+        <h1>Calm <strong>UI</strong></h1>
+        <p class="lede">A quieter home screen for anyone who wants one. A clock you like, the next thing on your plate, a few apps, and a timer for the work in front of you. <strong>No ads, no accounts, no tracking</strong> — everything stays on your phone.</p>
+
+        <div class="actions">
+            <a class="btn primary" href="https://play.google.com/store/apps/details?id=com.studentlauncher" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.3c-.3.3-.5.8-.5 1.4v16.6c0 .6.2 1.1.5 1.4l.1.1 9.3-9.3v-.2L3.7 2.2l-.1.1zm12.5 6.2L5.8 2.1l11.2 6.4h-.9zm0 6.9L5.8 21.9l10.3-5.9h.9l-1.3.9c.1 0 .2 0 .3-.1l3.2-1.8-3.2-1.8c-.1-.1-.2-.1-.3-.1l1.4 1.3z"/></svg>
+                Get it on Google Play
+            </a>
+            <a class="btn" href="https://github.com/jainam6610/calm-ui" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 1.8 2.7 1.3 3.3 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+                View source
+            </a>
+        </div>
+
+        <div class="grid">
+            <div class="item"><h2>Private by design</h2><p>No analytics, no ads, no third-party SDKs. Settings, tasks and widget content stay in app-private storage.</p></div>
+            <div class="item"><h2>Calm, not empty</h2><p>19 clock styles, widgets that matter, and Liquid Glass only where a surface floats.</p></div>
+            <div class="item"><h2>Detoxify</h2><p>A timed quiet mode with a PIN and an allow-list. Plain white home, just the countdown.</p></div>
+        </div>
+
+        <footer>
+            <a href="privacy.html">Privacy policy</a>
+            <span class="dot">·</span>
+            <a href="https://instagram.com/thats.jainam_dev" target="_blank" rel="noopener">@thats.jainam_dev</a>
+            <a href="https://instagram.com/thats.jainam" target="_blank" rel="noopener">@thats.jainam</a>
+            <span class="dot">·</span>
+            <span>© 2026 Jainam Karnawat</span>
+        </footer>
+    </main>
+</body>
+</html>

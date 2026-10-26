@@ -1,6 +1,12 @@
-# Google Play checklist for Student Launcher
+# Google Play checklist for Calm UI
 
-Developed by thats.jainam.
+Developed by Jainam Karnawat (thats.jainam).
+
+> **Rename note (2026-10-26):** the launcher is now called **Calm UI** and targets a
+> general audience, not only students. The application ID stays `com.studentlauncher`
+> so existing installs keep updating. The Play Console listing name must be changed
+> manually to **Calm UI** before the next release; the copy below is written for the
+> new positioning.
 
 ## Requirements this project already meets
 - targetSdk 36 / compileSdk 36. Google Play requires new apps and updates to target Android 16 (API 36) from August 31, 2026.
@@ -23,13 +29,13 @@ Developed by thats.jainam.
    New personal developer accounts may need a closed test with a minimum number of testers first. Check the current rule in Play Console.
 
 ## Store listing
-- App name: Student Launcher
+- App name: Calm UI
 - Category: Personalization
 - Short description (80 characters max):
-  A calm, distraction-free launcher for students with widgets and focus tools.
+  A quiet, privacy-first launcher with widgets and focus tools.
 - Full description:
 
-  Student Launcher is a minimal home screen built for studying.
+  Calm UI is a minimal Android home screen for anyone who wants their phone to feel less loud.
 
   Home
   - Your favourite apps in a clean list or grid, with an A to Z scrubber for everything else.
@@ -52,40 +58,49 @@ Developed by thats.jainam.
     Reminders are plain notifications. The app only counts the time of apps you open from
     it — no accessibility, no usage access and no overlay. An optional notification-access grant
     (special access, off by default) lets the launcher count notification metadata for its signals;
-    it never reads notification content and can be revoked at any time.
+    that listener never reads notification content and can be revoked at any time. The separate,
+    also optional Calm digest listener (off by default) saves the title and text of silenced
+    notifications on the phone only, for the digest; nothing is transmitted.
   - Optional, off-by-default reactions: a finished focus session can play a short matrix animation,
     and (if you allow it) a brief camera-light flash with hard limits built in. Call signals use the
     audio mode only and never read caller names, numbers, SMS, contacts or call logs. Notification
     signals count notifications from their metadata only — never their content.
-  - Detoxify: a timed quiet mode (1 hour to 1 month) in the style of a calm launcher. A short
-    four-step onboarding picks the length, the apps you allow and a PIN; the home screen then
-    becomes a plain countdown with lowercase app rows, always keeping phone, camera and clock.
-    Ending early takes your PIN and a 10-minute wait you can withdraw. No usage access, no
-    accessibility: blocking covers only what the launcher itself opens, and apps opened outside
-    the launcher are outside its reach.
+  - Detoxify: a timed quiet mode (1 hour to 1 month) in the style of a calm launcher. The start
+    sheet picks the length and the apps you allow; the home screen then becomes a plain countdown
+    with lowercase app rows, always keeping phone, camera, clock, timer and calculator.
+    A PIN is required to start a session. Ending early takes the same PIN and a 10-minute wait you
+    can withdraw. No usage access, no accessibility: blocking covers only what the launcher itself
+    opens, and apps opened outside the launcher are outside its reach. While a session runs, a
+    foreground-service notification keeps the countdown honest when another app is on screen.
 
   Private by design: no accounts, no ads, no tracking. Everything stays on your phone.
 
-  Developed by thats.jainam.
+  Developed by Jainam Karnawat (thats.jainam).
 
 ## Data safety form
 - Does your app collect or share any of the required user data types? **No.** Google's definition:
   "'Collect' means transmitting data from your app off a user's device" and "user data accessed by
   your app that is only processed locally … and not sent off device does not need to be disclosed"
-  (https://support.google.com/googleplay/android-developer/answer/10787469). The app has no
-  INTERNET permission and no network code, so the answer stops there.
+  (https://support.google.com/googleplay/android-developer/answer/10787469). The app declares
+  `INTERNET`, but only for the browser inside the Detoxify screen: requests go straight from
+  the phone to the site the user chose, and the developer operates no server and receives nothing.
+  There is no analytics, crash reporting, ads or other SDK. The answer therefore stays **No**, and
+  the in-app privacy policy says the same.
+- If a reviewer asks about the browser: it is a standard WebView with JavaScript and cookies,
+  reachable only from Detoxify's "browser" row; it stores no history beyond the open page, and the
+  listing and policy now disclose it.
 - Encryption in transit / deletion-request questions are only asked when the first answer is Yes.
-  If they do appear, answer: not applicable (no data leaves the device) and "users delete it
+  If they do appear, answer: not applicable (the developer receives no data) and "users delete it
   themselves: clear app storage or uninstall; nothing is stored on our servers".
 - Independent security review: No. Committed to Play Families policy: only if the app is declared
   to target children (see Content rating and audience).
-- Permissions/special access to explain if asked: POST_NOTIFICATIONS, only for the optional focus reminders; optional notification access, metadata only and off by default.
+- Permissions/special access to explain if asked: POST_NOTIFICATIONS for the optional reminders and the Detoxify countdown; INTERNET for the Detoxify browser; FOREGROUND_SERVICE / FOREGROUND_SERVICE_SPECIAL_USE for the Detoxify countdown; optional notification access, metadata only and off by default (plus the separate optional Calm digest, local-only).
 
 ## Content rating and audience
 - Answer the IARC questionnaire honestly: no violence, no user-generated content, no purchases, no ads,
   no location, no communication features, no personal information prompts.
-- Target audience (developer's final call): recommended **13-15, 16-18, 19-21, 22+** — i.e. students who
-  are teenagers and older, children under 12 excluded. That keeps the app outside the Google Play Families
+- Target audience (developer's final call): recommended **13-15, 16-18, 19-21, 22+** — a general
+  audience of teenagers and older, children under 12 excluded. That keeps the app outside the Google Play Families
   policy (which applies "if one of the target audiences for your app is children"). The app would already
   meet most of it (no ads, no third-party SDKs, nothing collected), so targeting under-12s is possible too —
   but then every Families rule, the listing imagery and the Data safety "Committed to follow the Play
@@ -100,11 +115,11 @@ Developed by thats.jainam.
 - Do not describe it as parental control or as an app blocker. It hides apps inside the launcher and sends reminders, it does not block other launchers or apps.
 - Reminders are inexact alarms and can arrive a little late when the phone is in battery saver.
 - Privacy policy URL (enter in Play Console → App content → Privacy policy):
-  https://jainam662010-boop.github.io/StudentLauncher/privacy.html
-  Source of truth is the repo-root `privacy.html` (GitHub Pages serves the root of `master`;
-  `gh api repos/jainam662010-boop/StudentLauncher/pages` → `source: {branch: master, path: "/"}`).
+  https://jainam6610.github.io/calm-ui/privacy.html
+  Source of truth is the repo-root `privacy.html` (GitHub Pages serves the root of `main`;
+  `gh api repos/jainam6610/calm-ui/pages` → `source: {branch: main, path: "/"}`).
   After editing it, commit + push and verify with
-  `curl.exe -sIL https://jainam662010-boop.github.io/StudentLauncher/privacy.html` (expect 200).
+  `curl.exe -sIL https://jainam6610.github.io/calm-ui/privacy.html` (expect 200).
 
 ## Store graphics included
 - `store/icon-512.png` (512 x 512 app icon)

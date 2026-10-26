@@ -10,9 +10,9 @@ Merged (release): `StudentLauncher/app/build/intermediates/merged_manifests/rele
 
 | Fact | Evidence |
 |---|---|
-| Permissions (source) | `AndroidManifest.xml:5` → `POST_NOTIFICATIONS` only (the notification-listener service at lines 71-79 is guarded by the system-held `BIND_NOTIFICATION_LISTENER_SERVICE`; it is not a requested `uses-permission`) |
-| Permissions (release merged) | `POST_NOTIFICATIONS` + `com.studentlauncher.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (auto-added by androidx.core for its own non-exported receiver; normal, not a user-facing permission) |
-| Optional special access | Notification access for `SignalsListenerService` (metadata only; off until the user grants it) — see §1.7 |
+| Permissions (source) | `AndroidManifest.xml:5-10` → `POST_NOTIFICATIONS`, `INTERNET` (Calm browser only), `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_SPECIAL_USE` (Detoxify countdown). The notification-listener services are guarded by the system-held `BIND_NOTIFICATION_LISTENER_SERVICE`; they are not requested `uses-permission` entries |
+| Permissions (release merged) | the four above + `com.studentlauncher.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (auto-added by androidx.core for its own non-exported receiver; normal, not a user-facing permission) |
+| Optional special access | Notification access for `SignalsListenerService` (metadata only) and `NotifListener` (Calm digest, title/text stored locally); both off until the user grants it — see §1.7 |
 | `QUERY_ALL_PACKAGES` | **absent** from source and merged manifest |
 | `<queries>` entries | `AndroidManifest.xml:7-29` → `MAIN/LAUNCHER` (app list), `DIAL`, `SENDTO smsto`, `VIEW https`, `IMAGE_CAPTURE`, `settings.SETTINGS` |
 | Exported components | `AndroidManifest.xml:40-54` `MainActivity` `exported="true"` with `MAIN` + `HOME` + `DEFAULT` + `LAUNCHER`; `AndroidManifest.xml:56-58` `FocusReminderReceiver` `exported="false"` |
@@ -47,8 +47,11 @@ Command: `rg -n 'https?://|HttpURLConnection|OkHttp|WebView|Socket|DownloadManag
 | `ui/FirstRun.kt:355` | opens the privacy policy URL in the user's browser |
 | `ui/WidgetSheets.kt:318` | opens the privacy policy URL in the user's browser |
 
-No `HttpURLConnection`, no OkHttp, no `WebView`, no `Socket`, no `DownloadManager`, no SDK init, no `mailto:`.
-**Verdict: the app never transmits data off the device.** Opening a URL in the user's browser is a user-initiated browser navigation, not app transmission. Supporting evidence: no INTERNET permission declared or merged (§1.1), so the process cannot open sockets at all.
+No `HttpURLConnection`, no OkHttp, no `Socket`, no `DownloadManager`, no SDK init, no `mailto:`.
+
+The one network surface is the browser ported from Calm (`com/calm/launcher/MainActivity.kt`, `makeWeb()`/`openBrowser()`): a standard `WebView` with JavaScript and cookies, reachable only from Calm's "browser" row and from links Calm opens. It loads pages the user types or taps, including the built-in Google start page. That is a direct user-initiated navigation from the phone to the site; the developer operates no server and receives nothing. `INTERNET` exists in the manifest only for this screen.
+
+**Verdict: the app itself sends no data to the developer.** Opening a URL in the user's browser or in the built-in Calm browser is a user-initiated navigation, not developer collection. All app state stays on the device.
 
 ## §1.4 Data the app creates or stores
 

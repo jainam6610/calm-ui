@@ -151,7 +151,7 @@ Additional verified facts useful for the program:
 | Play-compliance docs | **Present but stale** | `5e535ef`, `f32d92e`, `e06fc18`, `1db0aab`. They describe Tier 0 only and still say "no special access". |
 | Settings/icon-pack addendum referenced by §8 | **Missing** | No `antigravity-settings-iconpacks-addendum.md` or prompt files in the repo. ❓ Supply it before Phase 3. |
 
-Strengths to preserve: deep focus/Mindful/PIN system, 28 student widgets, no-INTERNET/no-ads/no-analytics, glyph matrix and reactions, offline Plan app, and the existing pure-policy + JVM-test pattern.
+Strengths to preserve: deep focus/Mindful/PIN system, 28 student widgets, no developer data collection (the only network use is the user-driven browser inside Calm), no ads, no analytics, glyph matrix and reactions, offline Plan app, and the existing pure-policy + JVM-test pattern.
 
 ---
 
@@ -172,7 +172,7 @@ But the **policy and store documentation are not reconciled**:
 | `StudentLauncher/docs/PLAY_STORE.md:51` | Says "no special access." That is now **false**. Notification access is a special access. |
 | `docs/play-compliance/FACT_SHEET.md:108` | Describes only Tier 0 call signals and the single permission. Not updated for Tier 1. |
 | `docs/play-compliance/SIGNALS_TIER1_GATE.md` | Records developer approval but leaves the Play Console sensitive-access/data-safety declaration unverified. |
-| In-app disclosure | The Settings section says "Counts notifications only, never their content" and offers "Grant notification access", but there is no prominent consent screen before the system settings jump and no link to the policy. |
+| In-app disclosure | The Settings section says "Counts notifications only, never their content" and offers "Grant notification access", but there is no prominent consent screen before the system settings jump and no link to the policy. The separate Calm digest listener is also opt-in and now documented as storing title/text locally. |
 
 **Verdict:** the technical gate is satisfied; the **Play/privacy gate is not**. Treat as a release blocker, not a code blocker. Recommended handling:
 
@@ -182,6 +182,8 @@ But the **policy and store documentation are not reconciled**:
 4. Do not ship Tier 1 until that Console check is confirmed.
 
 This needs your decision because §0 says a blocker stops the phase. It does not prevent starting Phase 0 code, but it must be scheduled before release.
+
+**Status after the Detoxify/privacy pass (October 24, 2026):** the documentation half of this gate is closed. `privacy.html`, `PLAY_STORE.md`, `FACT_SHEET.md`, `DATA_SAFETY_ANSWERS.md` and `PLAY_COMPLIANCE_REPORT.md` now disclose notification access (metadata only), the separate local-only Calm digest listener, the Calm `INTERNET` browser and the Detoxify foreground service. Tier 1 stays off by default. The remaining item is the human step in step 3: confirm the Play Console sensitive-access and Data safety declarations before upload.
 
 ---
 

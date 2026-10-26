@@ -10,7 +10,7 @@ Prepared 2026-10-08 from source evidence (see `FACT_SHEET.md`). This is a **Cons
 
 Source: *Provide information for Google Play's Data safety section*, https://support.google.com/googleplay/android-developer/answer/10787469 (fetched 2026-10-08).
 
-Why it applies here: the app declares **no `INTERNET` permission** (source and merged manifest, FACT_SHEET §1.1) and contains no networking code of any kind (FACT_SHEET §1.3). It physically cannot transmit data off the device.
+Why it applies here: the app declares `INTERNET` only for the optional browser inside the ported Calm screen (FACT_SHEET §1.3). Requests go directly from the device to the site the user chose; the developer runs no server, and there is no analytics, crash reporting or ad SDK. Everything the app itself creates stays on the device, so the answer remains **No**.
 
 ## Section-by-section answers
 
@@ -24,7 +24,7 @@ Consequence: per the form flow ("If you selected Yes, confirm the following…")
 
 | Question | Answer if shown | Why |
 |---|---|---|
-| Is all collected data encrypted in transit? | Not applicable — no data leaves the device | no network stack (FACT_SHEET §1.3) |
+| Is all collected data encrypted in transit? | Not applicable — the developer receives no data | browser traffic goes directly to the chosen site (FACT_SHEET §1.3) |
 | Do you provide a way for users to request deletion of their data? | Users delete everything themselves: Settings → Apps → Student Launcher → Storage → Clear storage, or uninstall | privacy.html "Retention and deletion" |
 
 Do **not** tick a claim the app cannot honour (e.g. an in-app deletion-request form) — none exists.
@@ -59,7 +59,7 @@ Processed on device only, therefore not declared (each with its source):
 
 | # | Data safety answer | Privacy policy sentence (`privacy.html`) that supports it | Source evidence | Match |
 |---|---|---|---|---|
-| 1 | Collects/shares no user data | "No data leaves your device. Student Launcher has no accounts, no ads and no analytics… We do not collect, transmit or share personal data" | no `INTERNET` permission (§1.1), zero network code (§1.3) | ✅ |
+| 1 | Collects/shares no user data | "no data is sent to the developer… no accounts, no ads and no analytics… We do not collect, transmit, sell or share personal data" | `INTERNET` exists only for the user-driven Calm browser (§1.3); no analytics/ad/crash SDK | ✅ |
 | 2 | (not declared) installed apps | "The app reads the list of installed apps… only to show your home screen and app list. This list stays on your device" | `<queries>` MAIN/LAUNCHER (§1.5) | ✅ |
 | 3 | (not declared) photos | "Wallpaper photos are chosen with Android's system photo picker… only stores a copy in its private storage" | `MainActivity.kt:43-47`, `Wallpapers.kt:64-94` | ✅ |
 | 4 | (not declared) plan/task/expense/GPA/habit/water/flashcard data | "Your tasks, events, widget content (including expenses, grades, habits and hydration logs), flashcards and settings stay on this device" | §1.4 rows | ✅ |

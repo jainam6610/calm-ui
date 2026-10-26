@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy – Student Launcher</title>
+    <meta name="description" content="Privacy policy for Calm UI — a quiet, open-source Android launcher. No accounts, no ads, no analytics, no tracking.">
+    <title>Privacy Policy – Calm UI</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -37,12 +38,16 @@
 </head>
 <body>
     <div class="container">
-        <h1>Privacy Policy — Student Launcher</h1>
-        <p class="date">App: <strong>Student Launcher</strong> (package <code>com.studentlauncher</code>) · Developer: <strong>thats.jainam</strong> (individual developer) · Effective date: <strong>October 8, 2026</strong></p>
+        <h1>Privacy Policy — Calm UI</h1>
+        <p class="date">App: <strong>Calm UI</strong> (package <code>com.studentlauncher</code>) · Developer: <strong>Jainam Karnawat</strong> (thats.jainam, individual developer) · Effective date: <strong>October 26, 2026</strong></p>
 
-        <p><strong>Short version: no data leaves your device.</strong> Student Launcher has no accounts, no advertising, no analytics and no third-party SDKs. The app is not given internet access (it has no <code>INTERNET</code> permission), so it cannot send anything to us or to anyone else. We do not collect, transmit, sell or share personal data.</p>
+        <p>Calm UI is the new name of the launcher previously published as <strong>Student Launcher</strong>. The application ID is unchanged (<code>com.studentlauncher</code>) and this policy covers every version released under either name.</p>
 
-        <p>If you tap a link inside the app (for example this policy), that link opens in <strong>your browser</strong>, which then loads the page. The app itself still sends nothing.</p>
+        <p>Calm UI is <strong>open source</strong> under the MIT licence. You can read, audit and build the same code that ships on Google Play at <a href="https://github.com/jainam6610/calm-ui" target="_blank" rel="noopener">github.com/jainam6610/calm-ui</a>.</p>
+
+        <p><strong>Short version: no data is sent to the developer.</strong> Calm UI has no accounts, no advertising, no analytics and no third-party SDKs. It does declare Android's <code>INTERNET</code> permission, but only so the optional browser built into the Detoxify screen can load the pages you type. That traffic goes directly from your phone to the site you chose; the developer never receives it, and there are no developer servers to receive anything. We do not collect, transmit, sell or share personal data.</p>
+
+        <p>If you tap a link inside the app (for example this policy), that link opens in <strong>your browser</strong>, which then loads the page. The built-in Detoxify browser behaves like any other browser: the sites you visit receive the usual request data (such as your IP address and any cookies they set), and the app stores no browsing history of its own beyond the page currently open.</p>
 
         <h2>What the app stores on your device</h2>
         <p>Everything below is written to the app's private storage on your phone only:</p>
@@ -62,8 +67,11 @@
 
         <h2>Permissions we request</h2>
         <ul>
-            <li><strong>Notifications (optional, <code>POST_NOTIFICATIONS</code>):</strong> used only to show the focus reminder ("10 min on …") while you are in an app you marked as distracting. It is requested only when you turn reminders on, and you can withdraw it at any time in system settings. If you deny it, everything else in the app still works; only the reminder is missing.</li>
+            <li><strong>Notifications (optional, <code>POST_NOTIFICATIONS</code>):</strong> used only to show the focus reminder ("10 min on …") while you are in an app you marked as distracting, and the ongoing Detoxify countdown. It is requested only when you turn reminders or Detoxify on, and you can withdraw it at any time in system settings. If you deny it, everything else in the app still works; only the notifications are missing.</li>
+            <li><strong>Internet (<code>INTERNET</code>):</strong> only for the browser inside the Detoxify screen, which loads pages you type or links you tap. Nothing is uploaded to the developer; there is no analytics or crash-reporting service.</li>
+            <li><strong>Foreground service (<code>FOREGROUND_SERVICE</code>, <code>FOREGROUND_SERVICE_SPECIAL_USE</code>):</strong> used only while a Detoxify session runs. It keeps the session's countdown honest when another app is on screen and shows an ongoing notification with the time left. It stops as soon as the session ends.</li>
             <li><strong>Notification access (optional, special access):</strong> if you grant it, the app's notification listener reads <strong>metadata only</strong> — the app package, category, post time, group-summary flag and importance. It never reads the title, body, people, icons or any other notification content. The access is off until you grant it in system settings, and you can revoke it at any time; the launcher works without it.</li>
+            <li><strong>Calm digest (optional, separate notification access):</strong> the Detoxify screen has its own optional listener. If you grant it, it saves the title and text of silenced notifications <strong>on your phone only</strong> so the digest can show them later. It never transmits them, and revoking the access stops it.</li>
         </ul>
         <p><code>POST_NOTIFICATIONS</code> is the only runtime permission the app requests. Notification access is a separate, optional special access you grant in Android Settings; it is not a manifest permission and the app cannot use it until you turn it on.</p>
         <p>There is no location, contacts, calendar, SMS, microphone, camera, storage, phone or usage-access permission.</p>
@@ -78,7 +86,7 @@
         <p>Android widgets you add are provided by their own apps and follow their own privacy policies. This app does not see or forward their content.</p>
 
         <h2>Children and young users</h2>
-        <p>Student Launcher does not ask for or collect personal information from anyone, including children: no name, no age, no email address, no contacts and no location. It contains no advertising, no in-app purchases, no user-generated content sharing and no third-party analytics. Younger users should ask a parent or guardian before installing any app.</p>
+        <p>Calm UI does not ask for or collect personal information from anyone, including children: no name, no age, no email address, no contacts and no location. It contains no advertising, no in-app purchases, no user-generated content sharing and no third-party analytics. Younger users should ask a parent or guardian before installing any app.</p>
 
         <h2>Security</h2>
         <p>All data sits in the app's private storage, which other apps on the device cannot read. If you set a PIN, only its salted hash is kept, and repeated wrong tries lock the keypad for a growing cool-down. Cloud backup and device-to-device transfer for this app are disabled (<code>allowBackup</code> is off and backup/transfer rules exclude all app data), so nothing is copied to Google Drive or a new phone.</p>
@@ -86,7 +94,7 @@
         <h2>Retention and deletion</h2>
         <p>Your data stays on the device only for as long as the app is installed. You delete it yourself, at any time, in either of these ways:</p>
         <ul>
-            <li>Settings → Apps → Student Launcher → Storage → <strong>Clear storage</strong> (removes every setting, task, widget entry, log and wallpaper copy), or</li>
+            <li>Settings → Apps → Calm UI → Storage → <strong>Clear storage</strong> (removes every setting, task, widget entry, log and wallpaper copy), or</li>
             <li><strong>Uninstall</strong> the app (app-private storage is removed with it).</li>
         </ul>
         <p>There is currently no separate "delete my data" button inside the app — clearing storage or uninstalling is the complete deletion path. Because we never receive your data, we have no copy to delete and cannot receive deletion requests; if that ever changes, this policy will say so before it happens.</p>
@@ -98,12 +106,15 @@
         <p>The effective date at the top of this page is updated whenever this policy changes. Material changes are announced in the app's Google Play listing release notes and in the app itself. The current version always lives at this same address.</p>
 
         <h2>Bugs and suggestions</h2>
-        <p>Find a bug or have a suggestion? Tag us and we will fix or add it within 30 days — email <a href="mailto:ruplaikarnawat01@gmail.com">ruplaikarnawat01@gmail.com</a> or message <strong>@thats.jainam.dev</strong> on Instagram.</p>
+        <p>Find a bug or have a suggestion? Open an issue on <a href="https://github.com/jainam6610/calm-ui/issues" target="_blank" rel="noopener">GitHub</a> or email <a href="mailto:ruplaikarnawat01@gmail.com">ruplaikarnawat01@gmail.com</a>. You can also message <strong>@thats.jainam_dev</strong> or <strong>@thats.jainam</strong> on Instagram. We aim to respond within 30 days.</p>
 
         <h2>Contact</h2>
-        <p>Privacy questions: <a href="mailto:ruplaikarnawat01@gmail.com">ruplaikarnawat01@gmail.com</a> · Instagram: <strong>@thats.jainam.dev</strong> · GitHub: <a href="https://github.com/thats.jainam" target="_blank" rel="noopener">github.com/thats.jainam</a></p>
+        <p>Privacy questions: <a href="mailto:ruplaikarnawat01@gmail.com">ruplaikarnawat01@gmail.com</a><br>
+        Instagram: <a href="https://instagram.com/thats.jainam_dev" target="_blank" rel="noopener">@thats.jainam_dev</a> · <a href="https://instagram.com/thats.jainam" target="_blank" rel="noopener">@thats.jainam</a><br>
+        GitHub: <a href="https://github.com/jainam6610" target="_blank" rel="noopener">github.com/jainam6610</a><br>
+        Google Play: <a href="https://play.google.com/store/apps/details?id=com.studentlauncher" target="_blank" rel="noopener">Calm UI</a></p>
 
-        <div class="footer">Student Launcher — private by design. Last updated: October 8, 2026.</div>
+        <div class="footer">Calm UI — private by design. Last updated: October 26, 2026.</div>
     </div>
 </body>
 </html>

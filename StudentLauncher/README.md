@@ -1,29 +1,32 @@
-# Student Launcher 3.0
+# Calm UI 3.2
 
-A calm, distraction-free Android launcher for students. Kotlin + Jetpack Compose, no third-party libraries.
-Developed by thats.jainam.
+A quiet, distraction-free Android launcher. Kotlin + Jetpack Compose, no third-party libraries. Previously published as Student Launcher; the application ID is still `com.studentlauncher`.
+
+Open source under the MIT licence · [Google Play](https://play.google.com/store/apps/details?id=com.studentlauncher) · [GitHub](https://github.com/jainam6610/calm-ui)
+
+Developed by **Jainam Karnawat** — [@jainam6610](https://github.com/jainam6610) · [@thats.jainam_dev](https://instagram.com/thats.jainam_dev) · [@thats.jainam](https://instagram.com/thats.jainam).
 
 ## Build
 1. Open this folder in Android Studio (latest stable) and let Gradle sync. If Studio offers newer AGP, Kotlin or Compose versions, accept them.
    Pinned versions: Gradle 8.11.1, AGP 8.9.1, Kotlin 2.1.20, Compose BOM 2025.04.01, compileSdk/targetSdk 36, minSdk 26.
-2. Run on a device or emulator, press Home and choose Student Launcher as the default home app.
+2. Run on a device or emulator, press Home and choose Calm UI as the default home app.
 3. Play Store: see docs/PLAY_STORE.md (signing, AAB, listing text, data safety, privacy policy, store graphics in store/).
 
 Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebug` (0 lint errors).
 
 ## Quiet Motion redesign
-- First-run onboarding is a five-step, skippable flow that ends by teaching the Apps handle, A-Z rail, widget resize, and Widget Board gestures. It only requests notification permission when the student explicitly chooses focus reminders; the flow can be restarted in Settings.
+- First-run onboarding is a five-step, skippable flow that ends by teaching the Apps handle, A-Z rail, widget resize, and Widget Board gestures. It only requests notification permission when the user explicitly chooses focus reminders; the flow can be restarted in Settings.
 - **Plan** is a first-party internal app, reached from Home. Tasks store title, course, ISO due date, priority, and completion locally in launcher preferences. No account or network is involved.
-- **Detoxify** is a timed quiet mode (1 hour, 1 day, 1 week or 30 days) in the style of Calm: a four-step start flow (length → allow-list → PIN → ready) with typed titles, dim body copy and pill choices; then a flat quiet home that shows only the countdown and lowercase rows for the apps the user allow-listed. Phone, camera and clock always work; everything else hides until the timer ends. The mode has its own Calm-style settings page (time left, allow-list, early exit, launcher settings). Ending early takes the PIN plus a 10-minute wait (withdrawable), and the session survives reboots and clock changes. No new permissions — blocking covers only what the launcher itself can reach.
-- Home uses a single widget language (12dp corners, neutral outlines, restrained red signal state). Widget placement uses Compose layout animation and the home canvas uses spring/fade-through motion; motion intensity and visual density are configurable in Settings.
+- **Detoxify** is a timed quiet mode (1 hour, 1 day, 1 week or 30 days): the start sheet picks the length and the apps on Detox home, then asks for the launcher PIN; then a plain white home shows only the countdown and lowercase rows for the apps the user allow-listed. Phone, camera, clock, timer and calculator always work; everything else hides until the timer ends. The mode has its own Detox settings page (time left, allow-list, early exit, launcher settings). Ending early takes the PIN plus a 10-minute wait (withdrawable), and the session survives reboots and clock changes. A foreground-service notification keeps the deadline honest while another app is on screen; blocking itself still covers only what the launcher can reach.
+- Home uses a single widget language (neutral tiles, a 1 dp hairline, no colour wash). Widget placement uses Compose layout animation and the home canvas uses spring/fade-through motion; motion intensity and visual density are configurable in Settings.
 - Settings is an ordinary internal launcher destination rather than a persistent menu bar. Existing wallpaper, app, widget, and focus controls remain available.
 
 ## What is new in 2.0
 - Wallpaper editor: blur, dim, and zoom + drag for photos (Style > Adjust wallpaper).
 - Widget system: add, reorder, edit and remove. Long-press any widget to edit it.
-  Clock (dot, digital, words, analog), date, week, battery, next up, exam countdown, study timer,
-  tasks, quick settings, 3D sphere, glyph matrix, plus regular Android widgets.
-  Each widget can use a Glass, Solid or None (no translucent cover) background, full or half width, and its own text colour.
+  Clock (dot, digital, words, analog, binary digits), date, week, battery, next up, exam countdown,
+  study timer, tasks, quick settings, 3D sphere, glyph matrix, plus regular Android widgets.
+  Each widget can use a Frosted, Solid or None (no cover) background, full or half width, and its own text colour.
 - Glyph matrix: a live 25 x 25 dot display (489 dots) that follows your phone. It shows the clock,
   switches to a charging ring (with a bolt while plugged in) while plugged in, and plays a short
   burst when a signal arrives — then settles and costs nothing (no idle frame loop). It does not
@@ -42,14 +45,14 @@ Verified green on this tree: `./gradlew testDebugUnitTest lintDebug assembleDebu
   notifications from their **metadata only** — package, category, post time, group-summary and
   importance flags. It never reads a title, body, sender, icon or extras, keeps counts in memory
   only, and ignores its own notifications and background noise.
-- Side rail dock (vertical glass pill) as an alternative to the bottom dock.
+- Side rail dock (vertical frosted pill) as an alternative to the bottom dock.
 - Focus reminders every 5, 10 or 15 minutes while you are in a distracting app you opened from the launcher.
   Uses an inexact alarm and a notification. No accessibility, usage-access or overlay permission.
 - Smoother motion: home/panel transition, blur depth and scrubber wave run in the draw phase, so they do not recompose.
 - Play Store readiness: target API 36, R8 + resource shrinking, signing config, docs, icon and feature graphic.
 
 ## Map
-- ui/Glass.kt: liquid glass modifier
+- ui/Glass.kt: the two-level material — flat frosted **content** (widgets) and liquid **chrome** (dock, sheets, search, handle, menus, toast) with an adaptive tint, specular rim and soft shadow; static edge lensing on Android 13+, an identical-looking fallback below it
 - ui/Home.kt: layers, transitions, overlays
 - ui/Widgets.kt, ui/WidgetSheets.kt, ui/HostedWidgets.kt: widgets, add/edit sheets, Android widget hosting
 - ui/GlyphMatrix.kt: 25 x 25 mask (489 cells) and the event-driven reactions
