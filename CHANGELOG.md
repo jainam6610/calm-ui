@@ -5,6 +5,20 @@ All notable changes to Calm UI are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Play Store releases are listed on
 the [store page](https://play.google.com/store/apps/details?id=com.studentlauncher).
 
+## [3.3.2] — 2026-10-27
+
+### Added
+
+- **Liquid glass is back**, held back so it cannot tint the interface. Chrome surfaces bend the
+  blurred wallpaper at their edge with a hint of dispersion (Android 13+), wear a specular rim
+  and an inner bevel, and cast a soft shadow. Widgets and cards take the cheaper plain backdrop
+  so a board can hold twenty of them without cost.
+
+### Fixed
+
+- **Binary Digits** showed the four-bit groups and then repeated the ordinary time underneath.
+  The clock is now bits only, matching the other minimal styles.
+
 ## [3.3.1] — 2026-10-27
 
 ### Fixed
@@ -80,7 +94,8 @@ Versions 2.0 through 3.1 were published on Google Play before this repository wa
 opened up. Their changes are summarised in the [project README](StudentLauncher/README.md)
 and the [phase reports](docs/program/).
 
-[Unreleased]: https://github.com/jainam6610/calm-ui/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/jainam6610/calm-ui/compare/v3.3.2...HEAD
+[3.3.2]: https://github.com/jainam6610/calm-ui/releases/tag/v3.3.2
 [3.3.1]: https://github.com/jainam6610/calm-ui/releases/tag/v3.3.1
 [3.3.0]: https://github.com/jainam6610/calm-ui/releases/tag/v3.3.0
 [3.2.0]: https://github.com/jainam6610/calm-ui/releases/tag/v3.2.0

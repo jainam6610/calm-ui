@@ -206,7 +206,7 @@ Status on 2026-10-26: **implemented and green**.
 
 The source changes in this pass are limited to:
 
-- `ui/Glass.kt` — two-level Liquid Glass: 160 px blurred sample, luminance-adaptive tint, specular rim, chrome-only shadow and API 33+ edge lensing with a same-looking fallback.
+- `ui/Glass.kt` — two-level Liquid Glass: 200 px blurred sample, luminance-adaptive tint, specular rim, chrome-only shadow and API 33+ edge lensing with a same-looking fallback.
 - `ui/Wallpapers.kt` — 160 px frosted copy plus wallpaper luminance for the tint.
 - `ui/Theme.kt` — wash palette removed.
 - `ui/GlyphStudio.kt`, `ui/Personalization.kt`, `ui/Widgets.kt` — wash call sites removed; binary clock added; quieter previews; light preview fixed; widget scroll fade.
@@ -218,19 +218,35 @@ The source changes in this pass are limited to:
 
 Glass-pass verification (2026-10-26, SM-G990E / Android 16): cold start 785 ms; no crashes or ANRs; light and dark Home, glass dock/handle, All Apps search above the IME with an "on home" badge, light Personalisation preview, widget fade and the Detox sheet all inspected on device.
 
+## Addendum — 3.3.2, liquid glass held back (2026-10-27)
+
+The neutral panel of 3.3.0 read as a flat card, and wallpaper structure was gone. Liquid glass
+returns, but held back so it can never read as coloured glass:
+
+- The surface is a blurred wallpaper sample (one 200 px bitmap per wallpaper), desaturated to
+  about two thirds of its chroma, then overlaid with a theme-coloured veil. A photo can tint the
+  rim a little, but never recolour a panel.
+- Chrome alone runs the AGSL edge-lensing shader (API 33+) with a hint of dispersion; it also
+  casts a shadow. Widgets and cards take the cheap backdrop crop so a board of twenty surfaces
+  stays cheap.
+- Every surface gets a specular streak and an inner bevel — light at the top-left, shade at the
+  bottom-right — which is what reads as thickness.
+
+`ui/Glass.kt` keeps both levels (`Content`, `Chrome`), `GlassEnv` / `LocalGlass` supply the
+blurred sample and luminance, and `Wallpapers.blur` feeds the sample plus the optional wallpaper
+accent colour.
+
+The trade-off is deliberate again: panels follow the theme rather than the photo, so contrast is
+predictable everywhere, and the shader runs on the few chrome surfaces only.
+
 ## Addendum — 3.3, the neutral panel (2026-10-27)
 
 The liquid-glass material above shipped in 3.2 and was removed in 3.3 after using it on a photo
 wallpaper: the sampled tint made sheets, the dock and menus take on the photo's colour, which read
 as "coloured glass" rather than quiet chrome.
 
-`ui/Glass.kt` now draws one material for both levels — a neutral fill, a hairline rim, a subtle top
-sheen on chrome, and a shadow on chrome only. There is no wallpaper sampling, no luminance-driven
+`ui/Glass.kt` drew one material for both levels — a neutral fill, a hairline rim, a subtle top
+sheen on chrome, and a shadow on chrome only. There was no wallpaper sampling, no luminance-driven
 tint and no AGSL shader left in the file. `GlassEnv` / `LocalGlass` are gone, and `Wallpapers.blur`
 survives only to derive a wallpaper accent colour when that option is on.
-
-The trade-off is deliberate: panels no longer react to the wallpaper, so contrast is predictable
-over photos, presets and plain white, and there is nothing GPU-side to warm up. The visual language
-is flatter and closer to a Nothing OS card than to Apple's optical glass, which also matches the
-"calm, not competing" brief better than a material that draws attention to itself.
 
