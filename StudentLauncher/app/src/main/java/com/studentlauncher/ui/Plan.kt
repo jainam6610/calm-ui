@@ -113,8 +113,7 @@ fun PlanApp(vm: LauncherViewModel) {
     }
 
     if (adding) PlanEditor(onDismiss = { adding = false }) { title, due, priority, course ->
-        vm.addPlanTask(title, due, priority, course)
-        adding = false
+        if (vm.addPlanTask(title, due, priority, course)) adding = false
     }
     editing?.let { task ->
         PlanEditor(
@@ -122,13 +121,11 @@ fun PlanApp(vm: LauncherViewModel) {
             onDismiss = { editing = null },
             onDelete = { vm.removePlanTask(task.id); editing = null }
         ) { title, due, priority, course ->
-            vm.updatePlanTask(task.copy(title = title, due = due, priority = priority, className = course))
-            editing = null
+            if (vm.updatePlanTask(task.copy(title = title, due = due, priority = priority, className = course))) editing = null
         }
     }
     if (addClass) ClassEditor(onDismiss = { addClass = false }) { title, date, time, course ->
-        vm.addPlanEvent(title, date, time, course)
-        addClass = false
+        if (vm.addPlanEvent(title, date, time, course)) addClass = false
     }
 }
 

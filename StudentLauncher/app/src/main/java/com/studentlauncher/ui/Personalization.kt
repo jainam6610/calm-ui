@@ -499,7 +499,7 @@ internal fun HomeSettingsPage(vm: LauncherViewModel) {
             Txt(stringResource(R.string.apps_on_home), 12f, c.fg2)
             Spacer(Modifier.height(6.dp))
             Segmented(
-                homeLimitOptions(vm.homeColumns).map { it to "$it" },
+                homeLimitOptions(vm.homeColumns, vm.homeAppLimit).map { it to "$it" },
                 vm.homeAppLimit,
                 vm::applyHomeAppLimit
             )

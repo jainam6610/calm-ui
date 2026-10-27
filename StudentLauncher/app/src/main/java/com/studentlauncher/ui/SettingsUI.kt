@@ -1,5 +1,8 @@
 package com.studentlauncher.ui
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +37,22 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/**
+ * Version straight from the installed package, e.g. "3.3 (13)". The Privacy page and the About
+ * sheet both read this, so neither can drift from the APK that is actually running.
+ */
+@Suppress("DEPRECATION")
+internal fun appVersionLabel(ctx: Context): String = runCatching {
+    val pm = ctx.packageManager
+    val info = if (Build.VERSION.SDK_INT >= 33) {
+        pm.getPackageInfo(ctx.packageName, PackageManager.PackageInfoFlags.of(0))
+    } else {
+        pm.getPackageInfo(ctx.packageName, 0)
+    }
+    val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+    "${info.versionName ?: "?"} ($code)"
+}.getOrDefault("unknown")
 
 /**
  * The clean Settings scaffold: a centred title, a quiet back arrow, and one scrolling column.

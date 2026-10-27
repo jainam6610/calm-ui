@@ -322,9 +322,7 @@ fun WidgetSettings(vm: LauncherViewModel, id: String) {
 fun AboutSheet(vm: LauncherViewModel) {
     val c = LocalColors.current
     val ctx = LocalContext.current
-    val version = remember {
-        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "3.2"
-    }
+    val version = remember(ctx) { appVersionLabel(ctx) }
     BottomSheet({ vm.aboutOpen = false }, 0.6f) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp).clip(CircleShape).background(c.accent))

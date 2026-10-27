@@ -2,7 +2,10 @@ package com.studentlauncher.signals
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
@@ -43,6 +46,21 @@ class SignalsListenerService : NotificationListenerService() {
             important = important
         )
         SignalStore.record(meta, packageName, SystemClock.elapsedRealtime())
+    }
+
+    /**
+     * Samsung (and some other OEMs) drop the listener binding after memory pressure or a long
+     * idle period. Asking for a rebind once re-establishes the connection without the user
+     * having to re-grant access.
+     */
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        // Only ask again while the user still trusts the app; a revoked grant should not spin.
+        if (!notificationAccessGranted(this)) return
+        val component = ComponentName(this, SignalsListenerService::class.java)
+        val retry = Runnable { runCatching { requestRebind(component) } }
+        // A short delay keeps a failing rebind from spinning.
+        Handler(Looper.getMainLooper()).postDelayed(retry, 2_000L)
     }
 }
 

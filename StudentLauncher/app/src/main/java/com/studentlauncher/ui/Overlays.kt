@@ -1,5 +1,7 @@
 package com.studentlauncher.ui
 
+import android.content.Intent
+import android.net.Uri
 import com.studentlauncher.data.WT
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
@@ -49,6 +51,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -147,6 +150,7 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
     ) {
         val pinned = app.pkg in vm.pinned
         val docked = app.pkg in vm.dock
+        val context = LocalContext.current
         CtxItem(if (pinned) "Remove from home" else "Pin to home") { visible.targetState = false; vm.togglePin(app.pkg) }
         if (pinned || docked) CtxItem(if (pinned) "Rearrange apps" else "Rearrange dock") {
             visible.targetState = false
@@ -157,7 +161,30 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
         CtxItem(if (docked) "Remove from dock" else "Add to dock") { visible.targetState = false; vm.toggleDock(app.pkg) }
         CtxItem(if (app.pkg in vm.flagged) "Not distracting" else "Mark as distracting") { visible.targetState = false; vm.toggleFlag(app.pkg) }
         CtxItem(if (app.pkg in vm.studyApps) "Not a study app" else "Mark as study app") { visible.targetState = false; vm.toggleStudyApp(app.pkg) }
+        CtxItem("App info") {
+            visible.targetState = false
+            if (!openSystemPage(context, app.pkg, android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)) {
+                vm.toast = "Couldn't open app info"
+            }
+        }
+        CtxItem("Uninstall") {
+            visible.targetState = false
+            if (!openSystemPage(context, app.pkg, Intent.ACTION_DELETE)) {
+                vm.toast = "Couldn't start uninstall"
+            }
+        }
     }
+}
+
+/**
+ * Sends a `package:` intent to the system, used for App info and Uninstall. The system owns both
+ * screens, so the launcher never needs the (heavily restricted) `REQUEST_DELETE_PACKAGES`
+ * permission. Returns false when the platform has nothing to handle the intent.
+ */
+private fun openSystemPage(context: android.content.Context, pkg: String, action: String): Boolean {
+    val intent = Intent(action, Uri.parse("package:$pkg"))
+    if (context !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    return runCatching { context.startActivity(intent) }.isSuccess
 }
 
 @Composable

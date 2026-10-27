@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +63,8 @@ fun SettingsApp(
 @Composable
 private fun SettingsRoot(vm: LauncherViewModel) {
     LaunchedEffect(Unit) { vm.reloadCalmConfig() }
+    val ctx = LocalContext.current
+    val version = remember(ctx) { appVersionLabel(ctx) }
     val layout = when (vm.layout) {
         HomeLayout.Grid -> "Grid · ${vm.homeColumns} columns"
         HomeLayout.List -> "List"
@@ -107,7 +110,7 @@ private fun SettingsRoot(vm: LauncherViewModel) {
         }
         SettingsGroup("Privacy & about") {
             SettingsLink("Privacy policy", "Opens in your browser", "privacy") { vm.settingsPage = SettingsPage.Privacy }
-            SettingsLink("About", "Calm UI 3.2", "info") { vm.aboutOpen = true }
+            SettingsLink("About", "Calm UI $version", "info") { vm.aboutOpen = true }
         }
         SettingsGroup("Advanced") {
             SettingsLink("Appearance & motion", "Font, density, scroll, motion", "advanced") {
@@ -211,6 +214,20 @@ private fun SignalsPage(vm: LauncherViewModel, requestNotifications: () -> Unit)
                 12f, c.fg2, maxLines = 4
             )
             Spacer(Modifier.height(10.dp))
+            if (vm.hasGlyphWidget()) {
+                Txt(
+                    "A glyph matrix is on your home screen or the widget board, so reactions and the live state have somewhere to show.",
+                    12f, c.fg2, maxLines = 2
+                )
+            } else {
+                Txt(
+                    "No glyph matrix on your home screen or the widget board, so reactions have nowhere to show.",
+                    12f, c.fg2, maxLines = 2
+                )
+                Spacer(Modifier.height(8.dp))
+                SettingsAction("Add a glyph matrix widget") { vm.addGlyphWidget() }
+            }
+            Spacer(Modifier.height(10.dp))
             if (vm.signalsAvailable) {
                 SettingsToggle("Call signals", "React when a call arrives", "signals", vm.signalsEnabled, vm::applySignalsEnabled)
             } else {
@@ -225,22 +242,35 @@ private fun SignalsPage(vm: LauncherViewModel, requestNotifications: () -> Unit)
                 vm::applyNotifSignals
             )
             LaunchedEffect(vm.notifSignalsEnabled) { vm.refreshNotifAccess() }
+            if (vm.notifSignalsEnabled) {
+                Spacer(Modifier.height(6.dp))
+                Txt(
+                    if (vm.notifAccess) {
+                        "Notification access is on, so new notifications reach the matrix."
+                    } else {
+                        "Notification access is off, so real notifications cannot reach the matrix yet."
+                    },
+                    12f, c.fg2, maxLines = 2
+                )
+                if (!vm.notifAccess) {
+                    Spacer(Modifier.height(10.dp))
+                    SettingsAction("Grant notification access") { vm.openNotificationAccess() }
+                    Spacer(Modifier.height(8.dp))
+                    SettingsAction("Check again") { vm.refreshNotifAccess() }
+                } else {
+                    val counts = vm.signalCounts()
+                    Spacer(Modifier.height(6.dp))
+                    Txt(
+                        "Counting signals: ${counts.second} in the last hour, ${counts.first} in total. Held in memory only.",
+                        12f, c.fg2, maxLines = 2
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            SettingsAction("Test reaction") { vm.testNotificationReaction() }
             vm.signalNotice?.let {
                 Spacer(Modifier.height(6.dp))
                 Txt(it, 12f, c.fg2, maxLines = 2)
-            }
-            if (vm.notifSignalsEnabled && !vm.notifAccess) {
-                Spacer(Modifier.height(10.dp))
-                SettingsAction("Grant notification access") { vm.openNotificationAccess() }
-                Spacer(Modifier.height(8.dp))
-                SettingsAction("Check again") { vm.refreshNotifAccess() }
-            } else if (vm.notifSignalsEnabled) {
-                val counts = vm.signalCounts()
-                Spacer(Modifier.height(6.dp))
-                Txt(
-                    "Counting signals: ${counts.second} in the last hour, ${counts.first} in total. Held in memory only.",
-                    12f, c.fg2, maxLines = 2
-                )
             }
         }
     }
@@ -287,6 +317,7 @@ private fun AdvancedPage(vm: LauncherViewModel) {
 private fun PrivacyPage(vm: LauncherViewModel) {
     val c = LocalColors.current
     val ctx = LocalContext.current
+    val version = remember(ctx) { appVersionLabel(ctx) }
     SettingsScaffold("Privacy & about", onBack = { vm.settingsPage = SettingsPage.Root }) {
         SettingsGroup("On this device") {
             Txt(
@@ -306,7 +337,7 @@ private fun PrivacyPage(vm: LauncherViewModel) {
             SettingsAction("About Calm UI") { vm.aboutOpen = true }
         }
         SettingsGroup("Version") {
-            Txt("Calm UI 3.2 (12)", 13f, c.fg2)
+            Txt("Calm UI $version", 13f, c.fg2)
         }
     }
 }

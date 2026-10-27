@@ -1,17 +1,18 @@
 package com.studentlauncher.data
 
 /**
- * Home app limit is always a whole number of grid rows. Changing columns keeps the current
- * number of rows (rounded up) instead of leaving a ragged last row.
+ * Choices offered by Settings: up to three whole rows for the current column count, plus
+ * [current] when it is not one of them.
+ *
+ * Columns and the app limit are independent settings. Changing the column count used to rewrite
+ * the limit to the next whole row, which looked like a second setting resetting itself. Keeping
+ * [current] in the list means the selected value survives a column change and the user can still
+ * pick a whole row afterwards.
  */
-fun snapHomeLimit(limit: Int, columns: Int): Int {
+fun homeLimitOptions(columns: Int, current: Int = 0): List<Int> {
     val c = columns.coerceIn(3, 5)
-    val rows = ((limit.coerceAtLeast(1) + c - 1) / c).coerceIn(1, 3)
-    return (rows * c).coerceIn(1, 16)
-}
-
-/** Choices offered by Settings: up to three rows of the current column count. */
-fun homeLimitOptions(columns: Int): List<Int> {
-    val c = columns.coerceIn(3, 5)
-    return (1..3).map { it * c }.filter { it <= 16 }
+    return ((1..3).map { it * c } + current)
+        .filter { it in 1..16 }
+        .distinct()
+        .sorted()
 }

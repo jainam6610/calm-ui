@@ -141,7 +141,6 @@ fun LauncherRoot(
             val slot = vm.shuffleSlot
             set = withContext(Dispatchers.Default) { Wallpapers.build(ctx, id, dark, wPx, hPx, adj, slot) }
         }
-        val env = remember(set, dark) { GlassEnv(set?.blurred, dark, wPx, set?.lum ?: 0.5f) }
         val accent = if (vm.wpAccent && set != null) {
             remember(set, vm.wpAccent) {
                 Wallpapers.dominantColor(set!!.blurred.asAndroidBitmap())
@@ -151,7 +150,6 @@ fun LauncherRoot(
 
         CompositionLocalProvider(
             LocalColors provides colors,
-            LocalGlass provides env,
             LocalMotionScale provides vm.effectiveMotion(),
             LocalFontFamily provides fontFamilyOf(vm.uiFont)
         ) {

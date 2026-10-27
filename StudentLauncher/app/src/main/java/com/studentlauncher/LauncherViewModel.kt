@@ -384,6 +384,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Manual check from Settings: plays the burst a message would, so the matrix can be verified
+     * without waiting for a real notification. It also reports what is missing.
+     */
+    fun testNotificationReaction() {
+        fireReaction(GlyphModes.PULSE)
+        refreshNotifAccess()
+        signalNotice = when {
+            !notifSignalsEnabled -> "Reaction sent. Turn Notification signals on for real ones."
+            !notifAccess -> "Reaction sent. Grant notification access for real ones."
+            else -> "Reaction sent"
+        }
+    }
+
     /** (total since start, last hour) — metadata counts only, never content. */
     fun signalCounts(): Pair<Int, Int> = SignalStore.counts(SystemClock.elapsedRealtime())
 
@@ -409,8 +423,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Home grid columns (3..5). Kept as a real setting instead of the old fixed 4. */
     var homeColumns by mutableIntStateOf(prefs.getInt("homeColumns", 4).coerceIn(3, 5)); private set
-    /** Always a whole number of rows for [homeColumns] (see data/HomeGrid.kt). */
-    var homeAppLimit by mutableStateOf(snapHomeLimit(prefs.getInt("homeAppLimit", 8), homeColumns)); private set
+    /** Independent of [homeColumns]; changing columns never rewrites it. */
+    var homeAppLimit by mutableStateOf(prefs.getInt("homeAppLimit", 8).coerceIn(1, 16)); private set
     var shuffleCount by mutableStateOf(prefs.getInt("shuffleCount", 0)); private set
     var shuffleSlot by mutableStateOf(0); private set
     // ---- onboarding (v4 key, migrated from v2) ----
@@ -1181,6 +1195,24 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         toast = "${WT.title(type)} added to ${if (widgetTargetHome) "Home" else "Board"}"
     }
 
+    /** A reaction needs somewhere to show up, so Settings checks this before offering one. */
+    fun hasGlyphWidget(): Boolean =
+        homeWidgets.any { it.type == WT.GLYPH } || boardWidgets.any { it.type == WT.GLYPH }
+
+    /**
+     * Puts the glyph matrix on the home screen with no panel behind it, so the dots read as
+     * light on the wallpaper rather than a card. No-op when one is already on either screen.
+     */
+    fun addGlyphWidget() {
+        if (hasGlyphWidget()) {
+            toast = "A glyph matrix is already added"
+            return
+        }
+        homeWidgets.add(newWidget(WT.GLYPH).copy(bg = WidgetBg.None))
+        saveHomeWidgets()
+        toast = "Glyph matrix added to Home"
+    }
+
     fun commitAndroidWidget(appId: Int) {
         val info = hostMgr.info(appId)
         val rowSpan = info?.minHeight?.takeIf { it > 0 }?.let(::rowSpanForFrameHeight) ?: 2
@@ -1510,12 +1542,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun applyHomeAppLimit(v: Int) { homeAppLimit = v.coerceIn(1, 16); prefs.edit().putInt("homeAppLimit", homeAppLimit).apply() }
 
-    /** Changing columns keeps the same number of rows, so the last row is never ragged. */
+    /**
+     * Only the column count changes. The home app limit is a separate setting and is left
+     * exactly as the user chose it, so one control never resets another.
+     */
     fun applyHomeColumns(v: Int) {
         homeColumns = v.coerceIn(3, 5)
         prefs.edit().putInt("homeColumns", homeColumns).apply()
-        val snapped = snapHomeLimit(homeAppLimit, homeColumns)
-        if (snapped != homeAppLimit) applyHomeAppLimit(snapped)
     }
 
     // ---- optional PIN ----
@@ -1524,11 +1557,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun requestCreatePin(onDone: () -> Unit = {}) { pinRequest = PinRequest("Create a PIN", PinMode.Create, onDone) }
-    fun requestChangePin() { pinRequest = PinRequest("Choose a new PIN", PinMode.Create) { } }
+
+    /** Changing a PIN first verifies the current one, so a borrowed phone cannot swap it. */
+    fun requestChangePin() {
+        guarded("Enter your current PIN") { requestCreatePin() }
+    }
+
+    /** Removing a PIN also verifies first; the forgot-PIN cooling-off path stays in [PinSheet]. */
     fun requestRemovePin() {
-        pin.clear()
-        onPinChanged()
-        toast = "PIN removed"
+        if (!pin.isSet) return
+        guarded("Enter your current PIN") {
+            pin.clear()
+            onPinChanged()
+            toast = "PIN removed"
+        }
     }
     fun applyProtectStudy(v: Boolean) { pin.protectStudyMode = v; protectStudy = v }
     fun onPinChanged() { pinSet = pin.isSet; protectStudy = pin.protectStudyMode }
@@ -1670,16 +1712,24 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun resetOnboarding() { onboardingComplete = false; putB("onboarding_done", false); putB("onboardingComplete", false) }
 
     // ---- plan ----
-    fun addPlanTask(title: String, due: String = "", priority: Int = 1, className: String = "") {
-        if (title.isBlank()) return
-        if (due.isNotBlank() && runCatching { LocalDate.parse(due) }.isFailure) { toast = "Use a valid date: YYYY-MM-DD"; return }
+    /** Returns false (and toasts) when the task was rejected, so the editor can stay open. */
+    fun addPlanTask(title: String, due: String = "", priority: Int = 1, className: String = ""): Boolean {
+        if (title.isBlank()) { toast = "Give the task a name"; return false }
+        if (due.isNotBlank() && runCatching { LocalDate.parse(due) }.isFailure) { toast = "Use a valid date: YYYY-MM-DD"; return false }
         planTasks.add(PlanTask(UUID.randomUUID().toString(), title.trim(), due, priority, false, className.trim()))
         savePlanTasks()
+        return true
     }
-    fun updatePlanTask(task: PlanTask) {
-        if (task.due.isNotBlank() && runCatching { LocalDate.parse(task.due) }.isFailure) { toast = "Use a valid date: YYYY-MM-DD"; return }
+
+    /** Same validation as [addPlanTask]; a blank title or bad date leaves the task untouched. */
+    fun updatePlanTask(task: PlanTask): Boolean {
+        if (task.title.isBlank()) { toast = "Give the task a name"; return false }
+        if (task.due.isNotBlank() && runCatching { LocalDate.parse(task.due) }.isFailure) { toast = "Use a valid date: YYYY-MM-DD"; return false }
         val i = planTasks.indexOfFirst { it.id == task.id }
-        if (i >= 0) { planTasks[i] = task; savePlanTasks() }
+        if (i < 0) return false
+        planTasks[i] = task.copy(title = task.title.trim(), className = task.className.trim())
+        savePlanTasks()
+        return true
     }
     fun removePlanTask(id: String) { planTasks.removeAll { it.id == id }; savePlanTasks() }
     fun startFocusFor(task: PlanTask) {
@@ -1688,10 +1738,12 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         else { toast = "Add a Study timer widget to begin focus"; return }
         toast = "Focus: ${task.title}"; destination = InternalDestination.Home
     }
-    fun addPlanEvent(title: String, date: String, time: String = "", course: String = "") {
-        if (title.isNotBlank() && runCatching { LocalDate.parse(date) }.isSuccess) {
-            planEvents.add(PlanEvent(UUID.randomUUID().toString(), title.trim(), date, time, course.trim())); savePlanEvents()
-        } else toast = "Use a valid date: YYYY-MM-DD"
+    fun addPlanEvent(title: String, date: String, time: String = "", course: String = ""): Boolean {
+        if (title.isBlank()) { toast = "Give the class a name"; return false }
+        if (runCatching { LocalDate.parse(date) }.isFailure) { toast = "Use a valid date: YYYY-MM-DD"; return false }
+        planEvents.add(PlanEvent(UUID.randomUUID().toString(), title.trim(), date, time, course.trim()))
+        savePlanEvents()
+        return true
     }
     fun removePlanEvent(id: String) { planEvents.removeAll { it.id == id }; savePlanEvents() }
     private fun savePlanTasks() = putS("plan_tasks", planTasks.joinToString("\n") { listOf(it.id, it.title.replace("|", " "), it.due, it.priority, it.completed, it.className.replace("|", " ")).joinToString("|") })

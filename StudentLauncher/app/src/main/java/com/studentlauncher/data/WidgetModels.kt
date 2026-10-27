@@ -282,7 +282,25 @@ fun newWidget(type: String): WidgetItem {
     )
 }
 
-fun defaultWidgets(): List<WidgetItem> = listOf(newWidget(WT.CLOCK), newWidget(WT.NEXT), newWidget(WT.TIMER))
+/**
+ * The look a fresh install starts with: one full-width, three-row clock with the system time,
+ * date and quote lines, and no panel behind it so it reads as type on the wallpaper.
+ *
+ * Kept as an explicit config rather than [newWidget] so changing the generic defaults for
+ * "Add a widget" never moves the first-run home screen.
+ */
+fun defaultWidgets(): List<WidgetItem> = listOf(
+    WidgetItem(
+        id = UUID.randomUUID().toString(),
+        type = WT.CLOCK,
+        bg = WidgetBg.None,
+        colSpan = WIDGET_COLUMNS,
+        rowSpan = 3,
+        size = 0,
+        tone = "auto",
+        cfg = mapOf("style" to "Dot", "fmt" to "sys", "date" to "1", "quote" to "1")
+    )
+)
 
 fun List<WidgetItem>.toJson(): String {
     val arr = JSONArray()

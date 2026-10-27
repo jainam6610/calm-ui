@@ -228,9 +228,8 @@ object Wallpapers {
     }
 
     /**
-     * Frosted copy that glass surfaces sample. Kept at 160px wide — enough colour and light for
-     * chrome to feel like glass, small enough to stay cheap — and sampled with scaled coords by
-     * GlassEnv.
+     * Frosted copy of the wallpaper, kept at 160px wide. It is only used to derive the wallpaper
+     * accent colour, so a small sample is plenty and stays cheap.
      */
     fun blur(src: Bitmap): Bitmap = blurTo(src, 160, 4, 3, upscale = false)
 
