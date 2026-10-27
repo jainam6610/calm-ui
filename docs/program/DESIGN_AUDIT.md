@@ -217,3 +217,20 @@ The source changes in this pass are limited to:
 - `README.md` — accurate description of the surface and clock list.
 
 Glass-pass verification (2026-10-26, SM-G990E / Android 16): cold start 785 ms; no crashes or ANRs; light and dark Home, glass dock/handle, All Apps search above the IME with an "on home" badge, light Personalisation preview, widget fade and the Detox sheet all inspected on device.
+
+## Addendum — 3.3, the neutral panel (2026-10-27)
+
+The liquid-glass material above shipped in 3.2 and was removed in 3.3 after using it on a photo
+wallpaper: the sampled tint made sheets, the dock and menus take on the photo's colour, which read
+as "coloured glass" rather than quiet chrome.
+
+`ui/Glass.kt` now draws one material for both levels — a neutral fill, a hairline rim, a subtle top
+sheen on chrome, and a shadow on chrome only. There is no wallpaper sampling, no luminance-driven
+tint and no AGSL shader left in the file. `GlassEnv` / `LocalGlass` are gone, and `Wallpapers.blur`
+survives only to derive a wallpaper accent colour when that option is on.
+
+The trade-off is deliberate: panels no longer react to the wallpaper, so contrast is predictable
+over photos, presets and plain white, and there is nothing GPU-side to warm up. The visual language
+is flatter and closer to a Nothing OS card than to Apple's optical glass, which also matches the
+"calm, not competing" brief better than a material that draws attention to itself.
+

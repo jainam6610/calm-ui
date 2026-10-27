@@ -32,7 +32,7 @@ Most launchers compete for attention. This one removes it:
 - **No feed, no suggestions, no ads, no analytics, no account.** The app declares `INTERNET` only for the browser inside Detoxify, so pages *you* open can load. Nothing is uploaded to the developer.
 - **Detoxify** is a timed quiet mode (1 hour → 30 days) with a PIN, an allow-list, and a plain-white home that shows only the countdown. Early exit takes the PIN plus a 10-minute wait.
 - **Plan** is a local-first task list: title, course or project, due date and priority, stored on the device.
-- **Liquid Glass, restrained.** A blurred wallpaper sample, an adaptive tint, a specular rim and a soft shadow on chrome only (dock, sheets, search, menus). Widgets stay flat and readable. The edge-lensing shader is static, Android 13+, and has a same-looking fallback.
+- **Quiet surfaces, not coloured glass.** Panels are one neutral fill with a hairline rim, a soft sheen and a shadow on chrome only (dock, sheets, search, menus). Nothing samples the wallpaper, so a photo can never tint a sheet, and no panel needs a shader.
 - **Everything is yours to change**: 19 clock styles, 5 moods, 7 icon packs, light/dark themes, an accent colour, two dock layouts, wallpapers from a bundled set or your own photos.
 
 ## Features
@@ -121,7 +121,7 @@ index.html                  Small landing page for the policy site
 
 ## Design and engineering notes
 
-- **One material system.** `ui/Glass.kt` defines `Content` and `Chrome` levels. Content never floats; chrome may lens and cast a shadow. No glass-on-glass stacks, no animated refraction.
+- **One material system.** `ui/Glass.kt` defines `Content` and `Chrome` levels. Content is a flat card; chrome may lift with a shadow. Both use the same neutral fill over every wallpaper — no wallpaper sampling, no AGSL shader, no glass-on-glass stacks.
 - **Persistence is boring on purpose.** `SharedPreferences` + immutable models, with migration tests for stored widget spans.
 - **Motion can be turned down.** Every spring and reveal respects a single motion scale; reduced-motion users get instant transitions.
 - **The interesting logic is pure and tested.** Detox rules, PIN policy, widget packing, binary clocks, drawer gestures and signal policies live in plain Kotlin files with no Android dependencies, so they are cheap to test.

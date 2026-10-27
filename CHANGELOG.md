@@ -5,20 +5,34 @@ All notable changes to Calm UI are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Play Store releases are listed on
 the [store page](https://play.google.com/store/apps/details?id=com.studentlauncher).
 
-## [Unreleased]
+## [3.3.0] — 2026-10-27
+
+A correctness release: settings stop rewriting each other, the PIN and Plan guards do what they
+say, and the interface drops coloured glass for one neutral panel.
+
+### Added
+
+- **App info** and **Uninstall** in the app long-press menu, both handed to the system through `package:` intents, so the launcher asks for no extra permission.
+- Signals page now reports whether notification access is actually granted, with **Grant notification access**, **Check again** and **Test reaction**.
+- **Add a glyph matrix widget** when no glyph matrix is on Home or the widget board, because a reaction has nowhere to appear without one.
+- First install starts with the real default home: one full-width, three-row, borderless clock tile (Dot style, system time, date and quote).
 
 ### Changed
 
+- **Glass is now a plain neutral panel everywhere.** One neutral fill, a hairline rim, a subtle top sheen and a chrome-only shadow. The wallpaper-sampled tint, the luminance-following chrome and the Android 13+ edge-lensing shader are gone, so a photo wallpaper can no longer colour sheets, the dock or menus.
+- The home app limit is independent of the grid column count. Changing columns no longer rewrites the limit, and the current limit stays selected even when it is not a whole row.
+- The About sheet, Privacy page and Settings row read the version from the installed package instead of a hardcoded string.
 - Gradle wrapper 8.14.6 and Kotlin 2.1.21 patch updates; the Compose compiler plugin follows the Kotlin version.
 
 ### Fixed
 
+- Changing or removing the PIN now requires the current PIN. Removing a PIN that was never set is a no-op instead of a misleading toast.
+- Plan and Class editors reject a blank title or a malformed date and stay open, instead of closing and silently dropping the entry.
+- The notification listener re-binds itself after Samsung/One UI drops it, and only while the access grant is still there.
 - Torch reactions no longer turn themselves off for the rest of the session when the camera is momentarily busy (a video call or another flashlight app). The app retries after 10 seconds and shows "Camera busy" instead of "No torch found".
 
 ### Planned
 
-- Fix the PIN removal path and require the PIN to change it
-- Validate Plan input (empty titles, impossible dates)
 - Make Back handling predictable across sheets and internal destinations
 - Larger touch targets for the smallest chrome controls
 
@@ -58,5 +72,6 @@ Versions 2.0 through 3.1 were published on Google Play before this repository wa
 opened up. Their changes are summarised in the [project README](StudentLauncher/README.md)
 and the [phase reports](docs/program/).
 
-[Unreleased]: https://github.com/jainam6610/calm-ui/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/jainam6610/calm-ui/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/jainam6610/calm-ui/releases/tag/v3.3.0
 [3.2.0]: https://github.com/jainam6610/calm-ui/releases/tag/v3.2.0
