@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.studentlauncher.LauncherViewModel
 import com.studentlauncher.data.AlphaSide
 import com.studentlauncher.data.DockStyle
@@ -329,7 +330,7 @@ private fun PrivacyPage(vm: LauncherViewModel) {
                 ctx.startActivity(
                     Intent(
                         Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://jainam6610.github.io/calm-ui/")
+                        "https://jainam6610.github.io/calm-ui/".toUri()
                     )
                 )
             }

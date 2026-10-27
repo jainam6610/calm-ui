@@ -1,7 +1,7 @@
 package com.studentlauncher.ui
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import com.studentlauncher.data.WT
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
@@ -182,7 +182,7 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
  * permission. Returns false when the platform has nothing to handle the intent.
  */
 private fun openSystemPage(context: android.content.Context, pkg: String, action: String): Boolean {
-    val intent = Intent(action, Uri.parse("package:$pkg"))
+    val intent = Intent(action, "package:$pkg".toUri())
     if (context !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     return runCatching { context.startActivity(intent) }.isSuccess
 }
