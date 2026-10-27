@@ -7,6 +7,12 @@
     <!-- Keeps a Detoxify deadline honest while another app is on screen. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!--
+      Normal permission, granted at install with no prompt. The system uninstaller closes itself
+      immediately ("Uid … does not have REQUEST_DELETE_PACKAGES") when the caller of ACTION_DELETE
+      has not declared it, so long-press → Uninstall needs this line to work.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <queries>
         <intent>

@@ -178,8 +178,9 @@ fun ContextMenu(vm: LauncherViewModel, app: AppInfo, anchor: Rect, screenW: Dp, 
 
 /**
  * Sends a `package:` intent to the system, used for App info and Uninstall. The system owns both
- * screens, so the launcher never needs the (heavily restricted) `REQUEST_DELETE_PACKAGES`
- * permission. Returns false when the platform has nothing to handle the intent.
+ * screens. Uninstall additionally needs REQUEST_DELETE_PACKAGES (a normal permission declared in
+ * the manifest); without it the system uninstaller closes itself as soon as it opens.
+ * Returns false when the platform has nothing to handle the intent.
  */
 private fun openSystemPage(context: android.content.Context, pkg: String, action: String): Boolean {
     val intent = Intent(action, "package:$pkg".toUri())

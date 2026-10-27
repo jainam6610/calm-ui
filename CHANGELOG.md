@@ -5,6 +5,14 @@ All notable changes to Calm UI are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Play Store releases are listed on
 the [store page](https://play.google.com/store/apps/details?id=com.studentlauncher).
 
+## [3.3.1] — 2026-10-27
+
+### Fixed
+
+- Long-press → **Uninstall** now opens the system uninstaller. Android requires the normal
+  `REQUEST_DELETE_PACKAGES` permission for `ACTION_DELETE`; without it the system dialog opened and
+  closed again in the same frame. No runtime prompt is involved.
+
 ## [3.3.0] — 2026-10-27
 
 A correctness release: settings stop rewriting each other, the PIN and Plan guards do what they
@@ -12,7 +20,7 @@ say, and the interface drops coloured glass for one neutral panel.
 
 ### Added
 
-- **App info** and **Uninstall** in the app long-press menu, both handed to the system through `package:` intents, so the launcher asks for no extra permission.
+- **App info** and **Uninstall** in the app long-press menu, both handed to the system through `package:` intents, so the launcher asks for no runtime permission.
 - Signals page now reports whether notification access is actually granted, with **Grant notification access**, **Check again** and **Test reaction**.
 - **Add a glyph matrix widget** when no glyph matrix is on Home or the widget board, because a reaction has nowhere to appear without one.
 - First install starts with the real default home: one full-width, three-row, borderless clock tile (Dot style, system time, date and quote).

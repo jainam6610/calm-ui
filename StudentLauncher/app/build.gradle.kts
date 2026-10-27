@@ -19,8 +19,8 @@ android {
         applicationId = "com.studentlauncher"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "3.3"
+        versionCode = 14
+        versionName = "3.3.1"
     }
 
     signingConfigs {
