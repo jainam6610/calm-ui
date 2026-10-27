@@ -80,6 +80,7 @@ Versions 2.0 through 3.1 were published on Google Play before this repository wa
 opened up. Their changes are summarised in the [project README](StudentLauncher/README.md)
 and the [phase reports](docs/program/).
 
-[Unreleased]: https://github.com/jainam6610/calm-ui/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/jainam6610/calm-ui/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/jainam6610/calm-ui/releases/tag/v3.3.1
 [3.3.0]: https://github.com/jainam6610/calm-ui/releases/tag/v3.3.0
 [3.2.0]: https://github.com/jainam6610/calm-ui/releases/tag/v3.2.0

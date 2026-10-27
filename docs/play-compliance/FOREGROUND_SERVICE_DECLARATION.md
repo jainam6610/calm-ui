@@ -1,6 +1,6 @@
 # Foreground service declaration — Play Console
 
-App: **Calm UI** (formerly Student Launcher; `com.studentlauncher`), versionCode 13, versionName 3.3, targetSdk 36
+App: **Calm UI** (formerly Student Launcher; `com.studentlauncher`), versionCode 14, versionName 3.3.1, targetSdk 36
 Prepared: 2026-10-25
 Source of truth: `StudentLauncher/app/src/main/AndroidManifest.xml:8-9,121-128`,
 `StudentLauncher/app/src/main/java/com/studentlauncher/detox/DetoxGuardService.kt`
@@ -141,7 +141,7 @@ install of the build you are submitting.
 
 ### 5.1 Fresh-install pre-flight (do this before recording)
 
-1. Uninstall any previous copy, then install the signed release build (`versionCode 11`).
+1. Uninstall any previous copy, then install the signed release build (`versionCode 14`).
    Do not record over old app data — the notification channel and PIN state must be fresh.
 2. Make it the default Home app: **Settings → Apps → Default apps → Home app → Student
    Launcher**. If it is not the default launcher, pressing Home leaves the session screen
@@ -152,7 +152,7 @@ install of the build you are submitting.
    appear in the shade.
 4. Turn off Do Not Disturb and battery saver. Set a long screen timeout. Record at 1080p
    with the status bar visible.
-5. Show the build once: **Settings → Version** should read **Calm UI 3.3 (13)**.
+5. Show the build once: **Settings → Version** should read **Calm UI 3.3.1 (14)**.
 
 ### 5.2 Exact taps
 
