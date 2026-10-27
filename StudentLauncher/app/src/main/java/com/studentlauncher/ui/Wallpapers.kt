@@ -228,10 +228,10 @@ object Wallpapers {
     }
 
     /**
-     * Frosted copy of the wallpaper, kept at 160px wide. It is only used to derive the wallpaper
-     * accent colour, so a small sample is plenty and stays cheap.
+     * Frosted copy of the wallpaper, kept at 200px wide. Every glass surface samples it, so it is
+     * the one blur the launcher pays for; 200px keeps a little of the photo's shape at low cost.
      */
-    fun blur(src: Bitmap): Bitmap = blurTo(src, 160, 4, 3, upscale = false)
+    fun blur(src: Bitmap): Bitmap = blurTo(src, 200, 3, 3, upscale = false)
 
     /** Mean perceived luminance of the wallpaper, sampled sparsely. */
     private fun luminance(src: Bitmap): Float {
