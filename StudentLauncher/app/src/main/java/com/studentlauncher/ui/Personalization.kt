@@ -696,7 +696,6 @@ private fun ClockPreview(
         "Neon" -> PreviewNeon(time, if (hero) 40f else 24f, accent)
         "Binary" -> BinaryDotClock(now, is24, fg, fg2, accent, compact = !hero)
         "Binary Digits" -> BinaryDigitClock(
-            time,
             if (is24) now.hour else ((now.hour + 11) % 12) + 1,
             now.minute,
             fg, fg2,

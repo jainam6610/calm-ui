@@ -675,7 +675,6 @@ private fun ClockContent(w: WidgetItem, style: String, fg: Color, fg2: Color, ac
         "Neon" -> NeonText(time, accent)
         "Binary" -> BinaryDotClock(now, is24, fg, fg2, accent)
         "Binary Digits" -> BinaryDigitClock(
-            time,
             if (is24) now.hour else ((now.hour + 11) % 12) + 1,
             now.minute,
             fg, fg2
@@ -1043,8 +1042,8 @@ private fun BinaryGroup(
 }
 
 /**
- * Binary digits: each decimal digit is written as a four-bit value, hours then minutes, with the
- * ordinary time underneath so the clock is still readable at a glance.
+ * Binary digits: each decimal digit is written as a four-bit value, hours then minutes. The bits
+ * are the whole clock — there is no plain-time readout underneath.
  */
 internal fun binaryDigitGroups(hour: Int, minute: Int): List<String> {
     fun encode(value: Int) = value.toString(2).padStart(4, '0')
@@ -1056,7 +1055,6 @@ internal fun binaryDigitGroups(hour: Int, minute: Int): List<String> {
 
 @Composable
 internal fun BinaryDigitClock(
-    time: String,
     hour: Int,
     minute: Int,
     fg: Color,
@@ -1068,20 +1066,16 @@ internal fun BinaryDigitClock(
         val chars = groups.sumOf { it.length } + 1
         val bitSize = (maxWidth.value / (chars * 0.62f))
             .coerceIn(8f, if (compact) 16f else 30f)
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                groups.forEachIndexed { i, group ->
-                    if (i > 0) {
-                        val gap = if (compact) 5.dp else 10.dp
-                        Spacer(Modifier.width(gap))
-                        MonoText(":", bitSize, fg2, FontWeight.Light)
-                        Spacer(Modifier.width(gap))
-                    }
-                    MonoText(group, bitSize, fg, FontWeight.Light)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            groups.forEachIndexed { i, group ->
+                if (i > 0) {
+                    val gap = if (compact) 5.dp else 10.dp
+                    Spacer(Modifier.width(gap))
+                    MonoText(":", bitSize, fg2, FontWeight.Light)
+                    Spacer(Modifier.width(gap))
                 }
+                MonoText(group, bitSize, fg, FontWeight.Light)
             }
-            Spacer(Modifier.height(if (compact) 3.dp else 7.dp))
-            MonoText(time, (bitSize * 0.62f).coerceAtLeast(9f), fg2, FontWeight.Light)
         }
     }
 }
